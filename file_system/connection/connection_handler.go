@@ -1,4 +1,4 @@
-package messages
+package connection
 
 import (
 	"encoding/binary"
@@ -7,19 +7,19 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type MessageHandler struct {
+type ConnectionHandler struct {
 	conn net.Conn
 }
 
-func NewMessageHandler(conn net.Conn) *MessageHandler {
-	m := &MessageHandler{
+func NewConnectionHandler(conn net.Conn) *ConnectionHandler {
+	m := &ConnectionHandler{
 		conn: conn,
 	}
 
 	return m
 }
 
-func (m *MessageHandler) readN(buf []byte) error {
+func (m *ConnectionHandler) readN(buf []byte) error {
 	bytesRead := uint64(0)
 	for bytesRead < uint64(len(buf)) {
 		n, err := m.conn.Read(buf[bytesRead:])
@@ -31,7 +31,7 @@ func (m *MessageHandler) readN(buf []byte) error {
 	return nil
 }
 
-func (m *MessageHandler) writeN(buf []byte) error {
+func (m *ConnectionHandler) writeN(buf []byte) error {
 	bytesWritten := uint64(0)
 	for bytesWritten < uint64(len(buf)) {
 		n, err := m.conn.Write(buf[bytesWritten:])
@@ -43,7 +43,7 @@ func (m *MessageHandler) writeN(buf []byte) error {
 	return nil
 }
 
-func (m *MessageHandler) Send(fileData *FileData) error {
+func (m *ConnectionHandler) Send(fileData *FileData) error {
 	serialized, err := proto.Marshal(fileData)
 	if err != nil {
 		return err
@@ -57,7 +57,7 @@ func (m *MessageHandler) Send(fileData *FileData) error {
 	return nil
 }
 
-func (m *MessageHandler) Receive() (*FileData, error) {
+func (m *ConnectionHandler) Receive() (*FileData, error) {
 	prefix := make([]byte, 8)
 	m.readN(prefix)
 
@@ -70,6 +70,6 @@ func (m *MessageHandler) Receive() (*FileData, error) {
 	return fileData, err
 }
 
-func (m *MessageHandler) Close() {
+func (m *ConnectionHandler) Close() {
 	m.conn.Close()
 }

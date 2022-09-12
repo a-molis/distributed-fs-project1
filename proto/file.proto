@@ -1,5 +1,5 @@
 syntax = "proto3";
-option go_package = "./messages";
+option go_package = "./connection";
 
 enum MessageType {
     LIST = 0;
