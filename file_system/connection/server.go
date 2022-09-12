@@ -15,6 +15,7 @@ func NewServer(port int32) *Server {
 	if err != nil {
 		log.Fatalf("Unable to create server on port %d", port)
 	}
+	log.Printf("listening at port %d", port)
 	return &Server{
 		listener: listener,
 	}

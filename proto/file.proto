@@ -12,7 +12,7 @@ enum MessageType {
 
 message FileData {
     MessageType messageType = 1;
-    int32 path = 2;
+    string path = 2;
     int32 size = 3;
     bytes data = 4;
     int32 checksum = 5;
