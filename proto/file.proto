@@ -1,0 +1,19 @@
+syntax = "proto3";
+option go_package = "./messages";
+
+enum MessageType {
+    LIST = 0;
+    PUT = 1;
+    REGISTRATION = 2;
+    GET = 3;
+    DELETE = 4;
+    ACK = 5;
+}
+
+message FileData {
+    MessageType messageType = 1;
+    int32 path = 2;
+    int32 size = 3;
+    bytes data = 4;
+    int32 checksum = 5;
+}
