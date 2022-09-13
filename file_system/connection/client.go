@@ -6,7 +6,7 @@ import (
 	"net"
 )
 
-func NewClient(host string, port int32)  (*ConnectionHandler, error)  {
+func NewClient(host string, port int)  (*ConnectionHandler, error)  {
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
 		log.Printf("received error while creating the client %s", err)

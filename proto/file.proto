@@ -16,4 +16,5 @@ message FileData {
     int32 size = 3;
     bytes data = 4;
     int32 checksum = 5;
+    string senderId = 6;
 }
