@@ -8,10 +8,11 @@ import (
 
 type StorageNode struct {
 	id                string
-	size				int32
+	size              int32
 	controllerPort    int
 	controllerHost    string
 	connectionHandler *connection.ConnectionHandler
+	running           bool
 }
 
 func NewStorageNode(id string, size int32, host string, port int) *StorageNode {
@@ -33,8 +34,12 @@ func (storageNode *StorageNode) Start() {
 
 	storageNode.register()
 
-	alive := true
-	go storageNode.heartbeat(&alive)
+	storageNode.running = true
+	go storageNode.heartbeat()
+}
+
+func (storageNode *StorageNode) Shutdown() {
+	storageNode.running = false
 }
 
 func (storageNode *StorageNode) register() {
@@ -52,13 +57,13 @@ func (storageNode *StorageNode) register() {
 	log.Println("Received ack from controller for registration")
 }
 
-func (storageNode *StorageNode) heartbeat(alive *bool) {
+func (storageNode *StorageNode) heartbeat() {
 	var heartBeatRate = time.Second * 5
 	message := &connection.FileData{}
 	message.MessageType = connection.MessageType_HEARTBEAT
 	message.SenderId = storageNode.id
 	message.Size = storageNode.size
-	for *alive {
+	for storageNode.running {
 		storageNode.connectionHandler.Send(message)
 		time.Sleep(heartBeatRate)
 	}

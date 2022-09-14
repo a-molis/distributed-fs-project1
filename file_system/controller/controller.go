@@ -10,6 +10,7 @@ type Controller struct {
 	port   int
 	server *connection.Server
 	memberTable *MemberTable
+	running bool
 }
 
 func NewController(id string, port int) *Controller {
@@ -17,35 +18,47 @@ func NewController(id string, port int) *Controller {
 	controller.id = id
 	controller.port = port
 	controller.memberTable = NewMemberTable()
+	controller.running = true
 	return controller
 }
 
 func (controller *Controller) Start() {
 	controller.server = connection.NewServer(controller.port)
-	controller.listen()
+	go controller.listen()
 }
 
 func (controller *Controller) listen() {
-	connectionHandler, err := controller.server.NextConnectionHandler()
-	if err != nil {
-		log.Println("Cannot get the connection handler ", err)
+	for controller.running {
+		connectionHandler, err := controller.server.NextConnectionHandler()
+		if err != nil {
+			log.Println("Cannot get the connection handler ", err)
+		}
+		go controller.handleConnection(connectionHandler)
 	}
-	go controller.handleConnection(connectionHandler)
 }
 
 func (controller *Controller) handleConnection(connectionHandler *connection.ConnectionHandler) {
-	message, err := connectionHandler.Receive()
-	if err != nil {
-		log.Println("Cannot receive message ", err)
+	for controller.running {
+		message, err := connectionHandler.Receive()
+		if err != nil {
+			log.Println("Cannot receive message ", err)
+		}
+		if message.MessageType == connection.MessageType_REGISTRATION {
+			controller.registerHandler(connectionHandler, message)
+		}
+		if message.MessageType == connection.MessageType_HEARTBEAT {
+			controller.heartbeatHandler(connectionHandler, message)
+		}
 	}
-	if message.MessageType == connection.MessageType_REGISTRATION {
-		controller.registerHandler(connectionHandler, message)
-	}
+}
+
+func (controller *Controller) shutdown() {
+	controller.running = false
 }
 
 func (controller *Controller) registerHandler(connectionHandler *connection.ConnectionHandler, message *connection.FileData) {
 	log.Println("Received registration message from ", message.SenderId)
-	err := controller.memberTable.register(message.SenderId)
+	err := controller.memberTable.Register(message.SenderId)
 	if err == nil {
 		ack := &connection.FileData{}
 		ack.MessageType = connection.MessageType_ACK
@@ -53,6 +66,10 @@ func (controller *Controller) registerHandler(connectionHandler *connection.Conn
 	} else {
 		log.Println("Error handling registration request")
 	}
+}
+
+func (controller *Controller) heartbeatHandler(connectionHandler *connection.ConnectionHandler, message *connection.FileData) {
+	controller.memberTable.RecordBeat(message.SenderId)
 }
 
 func (controller *Controller) List() []string{
