@@ -3,18 +3,21 @@ package storage
 import (
 	"P1-go-distributed-file-system/connection"
 	"log"
+	"time"
 )
 
 type StorageNode struct {
 	id                string
+	size				int32
 	controllerPort    int
 	controllerHost    string
 	connectionHandler *connection.ConnectionHandler
 }
 
-func NewStorageNode(id string, host string, port int) *StorageNode {
+func NewStorageNode(id string, size int32, host string, port int) *StorageNode {
 	storageNode := &StorageNode{}
 	storageNode.id = id
+	storageNode.size = size
 	storageNode.controllerPort = port
 	storageNode.controllerHost = host
 	return storageNode
@@ -29,6 +32,9 @@ func (storageNode *StorageNode) Start() {
 	storageNode.connectionHandler = connectionHandler
 
 	storageNode.register()
+
+	alive := true
+	go storageNode.heartbeat(&alive)
 }
 
 func (storageNode *StorageNode) register() {
@@ -44,4 +50,16 @@ func (storageNode *StorageNode) register() {
 		log.Println("Error getting ack")
 	}
 	log.Println("Received ack from controller for registration")
+}
+
+func (storageNode *StorageNode) heartbeat(alive *bool) {
+	var heartBeatRate = time.Second * 5
+	message := &connection.FileData{}
+	message.MessageType = connection.MessageType_HEARTBEAT
+	message.SenderId = storageNode.id
+	message.Size = storageNode.size
+	for *alive {
+		storageNode.connectionHandler.Send(message)
+		time.Sleep(heartBeatRate)
+	}
 }

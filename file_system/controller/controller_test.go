@@ -14,6 +14,8 @@ func TestController(t *testing.T) {
 
 	var members []string
 
+	var size int32 = 10
+
 	//bit for the controller
 	go func(port int, receivedMembers *[]string) {
 		controller := NewController("testId", port)
@@ -25,7 +27,7 @@ func TestController(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	go func(port int, id string) {
-		storageNode := storage.NewStorageNode(id, "localHost", port)
+		storageNode := storage.NewStorageNode(id, size,"localHost", port)
 		storageNode.Start()
 	}(port, testId)
 

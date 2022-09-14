@@ -8,6 +8,7 @@ enum MessageType {
     GET = 3;
     DELETE = 4;
     ACK = 5;
+    HEARTBEAT = 6;
 }
 
 message FileData {
