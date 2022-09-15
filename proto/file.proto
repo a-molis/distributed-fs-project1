@@ -2,20 +2,21 @@ syntax = "proto3";
 option go_package = "./connection";
 
 enum MessageType {
-    LIST = 0;
+    LS = 0;
     PUT = 1;
     REGISTRATION = 2;
     GET = 3;
-    DELETE = 4;
+    RM = 4;
     ACK = 5;
     HEARTBEAT = 6;
+    ACK_LS = 7;
 }
 
 message FileData {
     MessageType messageType = 1;
     string path = 2;
     int32 size = 3;
-    bytes data = 4;
+    string data = 4;
     int32 checksum = 5;
     string senderId = 6;
 }
