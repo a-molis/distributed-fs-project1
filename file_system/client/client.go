@@ -15,7 +15,7 @@ type Client struct {
 	connectionHandler *connection.ConnectionHandler
 }
 
-func NewClient(command string, controllerHost string, controllerPort int) *Client {
+func NewClient(controllerHost string, controllerPort int, command string) *Client {
 	client := &Client{}
 	client.command = command
 	client.controllerHost = controllerHost
@@ -49,6 +49,7 @@ func (client *Client) Start() {
 		log.Fatalf("Error client unable to connect to Controller %s", err)
 		return
 	}
+	log.Printf("Client connected to controller")
 	client.connectionHandler = connectionHandler
 
 	// send command
@@ -60,11 +61,14 @@ func (client *Client) sendToController(err error, message *connection.FileData, 
 	if err != nil {
 		log.Fatalln("Error sending data to controller")
 	}
+	log.Printf("Client sent command to server")
 	result, err := connectionHandler.Receive()
 	if err != nil {
 		log.Fatalln("Error receiving data from controller on the client")
 	}
+	log.Printf("Client received message back from controller")
 	if result.MessageType == connection.MessageType_LS {
+		log.Printf("Client received ls message back from controller")
 		client.ls(result, connectionHandler)
 	} else {
 		log.Fatalln("Error client unable to get result from controller")

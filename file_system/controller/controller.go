@@ -87,7 +87,9 @@ func (controller *Controller) ls(handler *connection.ConnectionHandler, connecti
 	// TODO update to have ls logic to get files in directory path
 	sendMessage.Data = "No files found"
 	err := handler.Send(sendMessage)
-	log.Println("Error sending ls data to client ", err)
+	if err != nil {
+		log.Println("Error sending ls data to client ", err)
+	}
 	ack := <-connectionChan
 	if ack.MessageType != connection.MessageType_ACK_LS {
 		// TODO retry if need to
