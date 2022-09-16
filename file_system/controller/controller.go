@@ -6,11 +6,11 @@ import (
 )
 
 type Controller struct {
-	id     string
-	port   int
-	server *connection.Server
+	id          string
+	port        int
+	server      *connection.Server
 	memberTable *MemberTable
-	running bool
+	running     bool
 }
 
 func NewController(id string, port int) *Controller {
@@ -38,16 +38,20 @@ func (controller *Controller) listen() {
 }
 
 func (controller *Controller) handleConnection(connectionHandler *connection.ConnectionHandler) {
+	connectionChan := make(chan *connection.FileData)
 	for controller.running {
 		message, err := connectionHandler.Receive()
 		if err != nil {
 			log.Println("Cannot receive message ", err)
 		}
 		if message.MessageType == connection.MessageType_REGISTRATION {
-			controller.registerHandler(connectionHandler, message)
-		}
-		if message.MessageType == connection.MessageType_HEARTBEAT {
-			controller.heartbeatHandler(connectionHandler, message)
+			go controller.registerHandler(connectionHandler, message)
+		} else if message.MessageType == connection.MessageType_HEARTBEAT {
+			go controller.heartbeatHandler(connectionHandler, message)
+		} else if message.MessageType == connection.MessageType_LS {
+			go controller.ls(connectionHandler, connectionChan, message)
+		} else if message.MessageType == connection.MessageType_ACK_LS {
+			connectionChan <- message
 		}
 	}
 }
@@ -72,6 +76,23 @@ func (controller *Controller) heartbeatHandler(connectionHandler *connection.Con
 	controller.memberTable.RecordBeat(message.SenderId)
 }
 
-func (controller *Controller) List() []string{
+func (controller *Controller) List() []string {
 	return controller.memberTable.List()
+}
+
+func (controller *Controller) ls(handler *connection.ConnectionHandler, connectionChan <-chan *connection.FileData, message *connection.FileData) {
+	sendMessage := &connection.FileData{}
+	sendMessage.MessageType = connection.MessageType_LS
+
+	// TODO update to have ls logic to get files in directory path
+	sendMessage.Data = "No files found"
+	err := handler.Send(sendMessage)
+	if err != nil {
+		log.Println("Error sending ls data to client ", err)
+	}
+	ack := <-connectionChan
+	if ack.MessageType != connection.MessageType_ACK_LS {
+		// TODO retry if need to
+		log.Println("Invalid ack for controller ls")
+	}
 }
