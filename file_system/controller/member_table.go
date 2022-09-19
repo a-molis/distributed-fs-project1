@@ -9,12 +9,13 @@ import (
 
 type MemberTable struct {
 	members map[string]Member
-	lock  sync.RWMutex
+	lock    sync.RWMutex
 }
 
 type Member struct {
-	status bool
-	lastBeat time.Time
+	status        bool
+	lastBeat      time.Time
+	availableSize int
 }
 
 func NewMemberTable() *MemberTable {
