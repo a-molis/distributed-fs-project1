@@ -8,7 +8,7 @@ import (
 
 func TestController(t *testing.T) {
 
-	var port int = 12000
+	var port int = 12010
 	host := "localhost"
 
 	testId := "storageTestId"
@@ -43,7 +43,7 @@ func TestController(t *testing.T) {
 
 func TestHeartBeatInactive(t *testing.T) {
 
-	var port int = 12001
+	var port int = 12011
 	host := "localhost"
 
 	testId := "storageTestId"
@@ -79,7 +79,7 @@ func TestHeartBeatInactive(t *testing.T) {
 
 func TestHeartBeat(t *testing.T) {
 
-	var port int = 12002
+	var port int = 12012
 	host := "localhost"
 
 	testId := "storageTestId"
@@ -114,7 +114,7 @@ func TestHeartBeat(t *testing.T) {
 
 func TestHeartBeatMultiNode(t *testing.T) {
 
-	var port int = 12003
+	var port int = 12013
 	host := "localhost"
 
 	testId := "storageTestId"
