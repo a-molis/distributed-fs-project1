@@ -7,23 +7,25 @@ import (
 
 type Controller struct {
 	id          string
+	host        string
 	port        int
 	server      *connection.Server
 	memberTable *MemberTable
 	running     bool
 }
 
-func NewController(id string, port int) *Controller {
+func NewController(id string, host string, port int) *Controller {
 	controller := &Controller{}
 	controller.id = id
 	controller.port = port
 	controller.memberTable = NewMemberTable()
 	controller.running = true
+	controller.host = host
 	return controller
 }
 
 func (controller *Controller) Start() {
-	controller.server = connection.NewServer(controller.port)
+	controller.server = connection.NewServer(controller.host, controller.port)
 	go controller.listen()
 }
 

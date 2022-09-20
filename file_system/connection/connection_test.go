@@ -1,6 +1,7 @@
 package connection
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"testing"
@@ -12,15 +13,16 @@ func TestBasicServer(t *testing.T) {
 	path := "some/path"
 
 	receivedPath := ""
-
-	server := NewServer(9999)
+	port := 12005
+	host := "localhost"
+	server := NewServer(host, port)
 
 	//bit for the client
 	go func(path string) {
 		message := &FileData{}
 		message.Path = path
 		message.MessageType = MessageType_PUT
-		conn, err := net.Dial("tcp", "localHost:9999") // connect to localhost port 9999
+		conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", host, port)) // connect to localhost port 9999
 		if err != nil {
 			log.Fatalln(err.Error())
 			return
@@ -36,7 +38,7 @@ func TestBasicServer(t *testing.T) {
 			t.Fatalf("got error %s", err)
 		}
 
-		receivedMessage, err :=connHandler.Receive()
+		receivedMessage, err := connHandler.Receive()
 		if err != nil {
 			t.Fatalf("got error %s", err)
 		}
@@ -56,16 +58,17 @@ func TestBasicClient(t *testing.T) {
 
 	receivedPath := ""
 
-	var port int = 9998
+	var port int = 12006
 
-	server := NewServer(port)
+	host := "localhost"
+	server := NewServer(host, port)
 
 	//bit for the client
 	go func(path string) {
 		message := &FileData{}
 		message.Path = path
 		message.MessageType = MessageType_PUT
-		connHand, _ := NewClient("localHost", port)
+		connHand, _ := NewClient(host, port)
 		connHand.Send(message)
 		return
 	}(path)
@@ -76,7 +79,7 @@ func TestBasicClient(t *testing.T) {
 			t.Fatalf("got error %s", err)
 		}
 
-		receivedMessage, err :=connHandler.Receive()
+		receivedMessage, err := connHandler.Receive()
 		if err != nil {
 			t.Fatalf("got error %s", err)
 		}

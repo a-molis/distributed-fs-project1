@@ -10,8 +10,9 @@ type Server struct {
 	listener net.Listener
 }
 
-func NewServer(port int) *Server {
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+func NewServer(host string, port int) *Server {
+	log.Println(host)
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
 		log.Fatalf("Unable to create server on port %d", port)
 	}

@@ -9,6 +9,7 @@ import (
 func TestController(t *testing.T) {
 
 	var port int = 12000
+	host := "localhost"
 
 	testId := "storageTestId"
 
@@ -18,7 +19,7 @@ func TestController(t *testing.T) {
 
 	//bit for the controller
 	go func(port int, receivedMembers *[]string) {
-		controller := NewController("testId", port)
+		controller := NewController("testId", host, port)
 		controller.Start()
 		time.Sleep(time.Second * 3)
 		*receivedMembers = controller.List()
@@ -27,7 +28,7 @@ func TestController(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	go func(port int, id string) {
-		storageNode := storage.NewStorageNode(id, size,"localHost", port)
+		storageNode := storage.NewStorageNode(id, size, "localHost", port)
 		storageNode.Start()
 	}(port, testId)
 
@@ -43,6 +44,7 @@ func TestController(t *testing.T) {
 func TestHeartBeatInactive(t *testing.T) {
 
 	var port int = 12001
+	host := "localhost"
 
 	testId := "storageTestId"
 
@@ -52,7 +54,7 @@ func TestHeartBeatInactive(t *testing.T) {
 
 	//bit for the controller
 	go func(port int, receivedMembers *[]string) {
-		controller := NewController("testId", port)
+		controller := NewController("testId", host, port)
 		controller.Start()
 		time.Sleep(time.Second * 15)
 		*receivedMembers = controller.List()
@@ -61,7 +63,7 @@ func TestHeartBeatInactive(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	go func(port int, id string) {
-		storageNode := storage.NewStorageNode(id, size,"localHost", port)
+		storageNode := storage.NewStorageNode(id, size, "localHost", port)
 		storageNode.Start()
 		storageNode.Shutdown()
 	}(port, testId)
@@ -78,6 +80,7 @@ func TestHeartBeatInactive(t *testing.T) {
 func TestHeartBeat(t *testing.T) {
 
 	var port int = 12002
+	host := "localhost"
 
 	testId := "storageTestId"
 
@@ -87,7 +90,7 @@ func TestHeartBeat(t *testing.T) {
 
 	//bit for the controller
 	go func(port int, receivedMembers *[]string) {
-		controller := NewController("testId", port)
+		controller := NewController("testId", host, port)
 		controller.Start()
 		time.Sleep(time.Second * 15)
 		*receivedMembers = controller.List()
@@ -96,7 +99,7 @@ func TestHeartBeat(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	go func(port int, id string) {
-		storageNode := storage.NewStorageNode(id, size,"localHost", port)
+		storageNode := storage.NewStorageNode(id, size, "localHost", port)
 		storageNode.Start()
 	}(port, testId)
 
@@ -112,6 +115,7 @@ func TestHeartBeat(t *testing.T) {
 func TestHeartBeatMultiNode(t *testing.T) {
 
 	var port int = 12003
+	host := "localhost"
 
 	testId := "storageTestId"
 	testId2 := "storageTestId2"
@@ -122,7 +126,7 @@ func TestHeartBeatMultiNode(t *testing.T) {
 
 	//bit for the controller
 	go func(port int, receivedMembers *[]string) {
-		controller := NewController("testId", port)
+		controller := NewController("testId", host, port)
 		controller.Start()
 		time.Sleep(time.Second * 20)
 		*receivedMembers = controller.List()
@@ -131,14 +135,14 @@ func TestHeartBeatMultiNode(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	go func(port int, id string) {
-		storageNode := storage.NewStorageNode(id, size,"localHost", port)
+		storageNode := storage.NewStorageNode(id, size, "localHost", port)
 		storageNode.Start()
 		time.Sleep(time.Second * 1)
 		storageNode.Shutdown()
 	}(port, testId)
 
 	go func(port int, id string) {
-		storageNode := storage.NewStorageNode(id, size,"localHost", port)
+		storageNode := storage.NewStorageNode(id, size, "localHost", port)
 		storageNode.Start()
 	}(port, testId2)
 
