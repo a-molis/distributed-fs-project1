@@ -101,16 +101,16 @@ func (controller *Controller) ls(handler *connection.ConnectionHandler, connecti
 
 func (controller *Controller) upload(handler *connection.ConnectionHandler) {
 	// TODO add logic
-	// 1. client connect and requests to upload file
+	// 1. client connect and requests to upload chunks and names of chunks
 	// 2. check in FileMetadata if path exists - if exists send error back
 	// 3. If path does not exist
 	//  - reserve the path with a pending state
 	// 4. go to member table to ask for nodes that have enough space. -> if there is not enough space on enough nodes return message saying out of space
-	// 5. if enough space member table returns list of storage nodes
+	// 5. if enough space member table returns list of storage nodes per chunk
 	// 6 reserve space on member table -- subtract space out
-	// 7. return array of storage nodes as protobuf
-	//    - Wait for ack from client that client got list of storage nodes
-	// 8. Get heart beat message from storage node that file is uploaded to storage node
+	// 7. return chunk info to client
+	//    - Wait for ack from client that client got list of chunks
+	// 8. Get heart beat message from storage node that chunk is uploaded to storage node
 	// 9. When N number of storage nodes respond back with ack of file then set status to Complete
 	// end.
 }
