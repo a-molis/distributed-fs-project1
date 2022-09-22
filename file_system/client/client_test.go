@@ -9,7 +9,8 @@ import (
 
 func TestBasicClient(t *testing.T) {
 
-	var port int = 12004
+	var port int = 12024
+	host := "localhost"
 
 	testId := "storageTestId"
 	testId2 := "storageTestId2"
@@ -20,7 +21,7 @@ func TestBasicClient(t *testing.T) {
 
 	//bit for the controller
 	go func(port int, receivedMembers *[]string) {
-		testController := controller.NewController("testId", port)
+		testController := controller.NewController("testId", host, port)
 		testController.Start()
 		time.Sleep(time.Second * 1)
 		*receivedMembers = testController.List()
