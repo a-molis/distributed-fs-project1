@@ -9,7 +9,7 @@ import (
 
 func TestBasicClient(t *testing.T) {
 
-	var port int = 12014
+	var port int = 12024
 	host := "localhost"
 
 	testId := "storageTestId"
