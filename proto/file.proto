@@ -19,11 +19,16 @@ message FileData {
     string data = 4;
     int32 checksum = 5;
     string senderId = 6;
-    repeated Node nodes = 7;
+    repeated Chunk chunk = 7;
 }
 
 message Node {
     string id = 1;
     string hostname = 2;
     int32 port = 3;
+}
+
+message Chunk {
+    string name = 1;
+    repeated Node nodes = 2;
 }

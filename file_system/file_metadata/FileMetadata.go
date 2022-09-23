@@ -62,11 +62,18 @@ func newNode(path string) *Node {
 	return node
 }
 
+// TODO chunks to use set data type
 type File struct {
-	name         string
+	name          string
+	chunks        []Chunk
+	status        Status
+	pendingChunks int
+}
+
+type Chunk struct {
 	checksum     string
 	status       Status
-	storageNodes string[]
+	storageNodes []string
 }
 
 type Status int32
