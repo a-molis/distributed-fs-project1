@@ -10,6 +10,7 @@ enum MessageType {
     ACK = 5;
     HEARTBEAT = 6;
     ACK_LS = 7;
+    ERROR = 8;
 }
 
 message FileData {

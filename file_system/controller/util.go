@@ -44,6 +44,7 @@ func generateNodes(ids []string, memberTable *MemberTable) []*connection.Node {
 	return res
 }
 
+// TODO move this to function in member table
 func findAvailableNodes(chunks []*file_metadata.Chunk, memberTable *MemberTable) error {
 	listOfNodes := make([]string, 0)
 	for key := range memberTable.members {
@@ -52,7 +53,7 @@ func findAvailableNodes(chunks []*file_metadata.Chunk, memberTable *MemberTable)
 
 	for _, chunk := range chunks {
 
-		for j:= 0; j < 3; {
+		for j := 0; j < 3; {
 			idx := rand.Intn(len(listOfNodes))
 			if memberTable.members[listOfNodes[idx]].availableSize > chunk.Size && !contains(listOfNodes[idx], chunk.StorageNodes) {
 				chunk.StorageNodes = append(chunk.StorageNodes, listOfNodes[idx])
