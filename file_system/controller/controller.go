@@ -2,6 +2,7 @@ package controller
 
 import (
 	"P1-go-distributed-file-system/connection"
+	"P1-go-distributed-file-system/file_metadata"
 	"log"
 )
 
@@ -11,6 +12,7 @@ type Controller struct {
 	port        int
 	server      *connection.Server
 	memberTable *MemberTable
+	fileMetadata *file_metadata.FileMetadata
 	running     bool
 }
 
@@ -21,6 +23,7 @@ func NewController(id string, host string, port int) *Controller {
 	controller.memberTable = NewMemberTable()
 	controller.running = true
 	controller.host = host
+	controller.fileMetadata = file_metadata.NewFileMetaData()
 	return controller
 }
 
@@ -54,6 +57,8 @@ func (controller *Controller) handleConnection(connectionHandler *connection.Con
 			go controller.ls(connectionHandler, connectionChan, message)
 		} else if message.MessageType == connection.MessageType_ACK_LS {
 			connectionChan <- message
+		} else if message.MessageType == connection.MessageType_PUT {
+			go controller.uploadHandler(connectionHandler, message)
 		}
 	}
 }
@@ -82,6 +87,27 @@ func (controller *Controller) List() []string {
 	return controller.memberTable.List()
 }
 
+func (controller *Controller) uploadHandler(connectionHandler *connection.ConnectionHandler, message *connection.FileData) {
+	filepath := message.GetData()
+	checksum := message.GetChecksum()
+	chunks := ProtoToChunk(message.GetChunk())
+	err := findAvailableNodes(chunks, controller.memberTable)
+	if err != nil {
+		log.Println("could  not assign nodes to chunks, ", err)
+	}
+	err = controller.fileMetadata.UploadChunks(filepath, chunks, checksum)
+	if err != nil {
+		log.Println("could  not upload chunks to filetree, ", err)
+	}
+	// prepare client response
+
+	response := &connection.FileData{}
+	response.MessageType = connection.MessageType_PUT
+	response.Chunk = chunkToProto(chunks, controller.memberTable)
+	response.Path = filepath
+	connectionHandler.Send(response)
+}
+
 func (controller *Controller) ls(handler *connection.ConnectionHandler, connectionChan <-chan *connection.FileData, message *connection.FileData) {
 	sendMessage := &connection.FileData{}
 	sendMessage.MessageType = connection.MessageType_LS
@@ -102,6 +128,7 @@ func (controller *Controller) ls(handler *connection.ConnectionHandler, connecti
 func (controller *Controller) upload(handler *connection.ConnectionHandler) {
 	// TODO add logic
 	// 1. client connect and requests to upload chunks and names of chunks
+	// filename, chunk name, chunk size, overall checksum, chunk checksum
 	// 2. check in FileMetadata if path exists - if exists send error back
 	// 3. If path does not exist
 	//  - reserve the path with a pending state

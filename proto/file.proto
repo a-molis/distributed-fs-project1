@@ -30,5 +30,7 @@ message Node {
 
 message Chunk {
     string name = 1;
-    repeated Node nodes = 2;
+    int32 size = 2;
+    int32 checksum = 3;
+    repeated Node nodes = 4;
 }

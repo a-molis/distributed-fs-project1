@@ -15,7 +15,9 @@ type MemberTable struct {
 type Member struct {
 	status        bool
 	lastBeat      time.Time
-	availableSize int
+	availableSize int32
+	port int32 // TODO fill in this information
+	host string
 }
 
 func NewMemberTable() *MemberTable {

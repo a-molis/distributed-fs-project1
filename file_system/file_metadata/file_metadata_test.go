@@ -6,7 +6,7 @@ import (
 )
 
 func TestUpload(t *testing.T) {
-	fmdt := newFileMetaData()
+	fmdt := NewFileMetaData()
 	fmdt.upload("/foo/path/somedir/file.txt")
 	fmdt.upload("/foo/path/file.txt")
 	fmdt.upload("/foo/path/somedir/file2.txt")

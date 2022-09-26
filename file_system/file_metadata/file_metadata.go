@@ -9,7 +9,7 @@ type FileMetadata struct {
 	rootNode *Node
 }
 
-func newFileMetaData() *FileMetadata {
+func NewFileMetaData() *FileMetadata {
 	path := "/"
 	rootNode := newNode(path)
 	return &FileMetadata{rootNode: rootNode}
@@ -25,13 +25,13 @@ func (fileMetadata *FileMetadata) upload(path string) error {
 		return errors.New("file already exists")
 	}
 	file := &File{}
-	file.name = fileName
-	file.status = Pending
+	file.Name = fileName
+	file.Status = Pending
 	directoryNode.files[fileName] = file
 	return nil
 }
 
-func (fileMetadata *FileMetadata) uploadChunks(path string, chunks []Chunk) error {
+func (fileMetadata *FileMetadata) UploadChunks(path string, chunks []*Chunk, checksum int32) error {
 	pathSplit := strings.Split(path, "/")
 	fileName := pathSplit[len(pathSplit)-1]
 	directoryPath := strings.Replace(path, fileName, "", -1)
@@ -41,10 +41,11 @@ func (fileMetadata *FileMetadata) uploadChunks(path string, chunks []Chunk) erro
 		return errors.New("file already exists")
 	}
 	file := &File{}
-	file.name = fileName
-	file.status = Pending
-	file.chunks = chunks
-	file.pendingChunks = len(chunks)
+	file.Name = fileName
+	file.Status = Pending
+	file.Chunks = chunks
+	file.Checksum = checksum
+	file.PendingChunks = len(chunks)
 	directoryNode.files[fileName] = file
 	return nil
 }
@@ -75,13 +76,13 @@ func (fileMetadata *FileMetadata) ls(path string) string {
 	return strings.TrimSuffix(res, " ")
 }
 
-func (fileMetadata *FileMetadata) download(path string) []Chunk {
+func (fileMetadata *FileMetadata) download(path string) []*Chunk {
 	pathSplit := strings.Split(path, "/")
 	fileName := pathSplit[len(pathSplit)-1]
 	directoryPath := strings.Replace(path, fileName, "", -1)
 	directoryNode := getNode(fileMetadata.rootNode, directoryPath)
 	file := directoryNode.files[fileName]
-	return file.chunks
+	return file.Chunks
 }
 
 type Node struct {
@@ -100,16 +101,19 @@ func newNode(path string) *Node {
 
 // TODO chunks to use set data type
 type File struct {
-	name          string
-	chunks        []Chunk
-	status        Status
-	pendingChunks int
+	Name          string
+	Chunks        []*Chunk
+	Status        Status
+	Checksum	int32
+	PendingChunks int
 }
 
 type Chunk struct {
-	checksum     string
-	status       Status
-	storageNodes []string
+	Name 		string
+	Size int32
+	Checksum     int32
+	Status       Status
+	StorageNodes []string
 }
 
 type Status int32
