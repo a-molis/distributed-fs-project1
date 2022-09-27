@@ -11,7 +11,7 @@ type Config struct {
 }
 
 func ConfigFromPath(path string) (*Config, error) {
-	configBytes, err := file_io.OpenFile(path)
+	configBytes, err := file_io.ReadFile(path)
 	if err != nil {
 		log.Printf("Error reading config %s %s\n", path, err)
 	}

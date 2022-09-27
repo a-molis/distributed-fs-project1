@@ -20,6 +20,7 @@ func (fileMetadata *FileMetadata) upload(path string) error {
 	fileName := pathSplit[len(pathSplit)-1]
 	directoryPath := strings.Replace(path, fileName, "", -1)
 	directoryNode := getNode(fileMetadata.rootNode, directoryPath, true)
+	// TODO once getNode returns error add error handling
 	_, ok := directoryNode.files[fileName]
 	if ok {
 		return errors.New("file already exists")
@@ -36,6 +37,7 @@ func (fileMetadata *FileMetadata) UploadChunks(path string, chunks []*Chunk, che
 	fileName := pathSplit[len(pathSplit)-1]
 	directoryPath := strings.Replace(path, fileName, "", -1)
 	directoryNode := getNode(fileMetadata.rootNode, directoryPath, true)
+	// TODO once getNode returns error add error handling
 	_, ok := directoryNode.files[fileName]
 	if ok {
 		return errors.New("file already exists")
@@ -60,8 +62,11 @@ func getNode(node *Node, path string, write bool) *Node {
 	if !ok {
 		if write {
 			node.dirs[directoryName] = newNode(directoryName)
+			directoryNode = node.dirs[directoryName]
+		} else {
+			// TODO refactor to return tuple with (*Node, error)
+			return nil
 		}
-		directoryNode = node.dirs[directoryName]
 	}
 	return getNode(directoryNode, strings.TrimPrefix(path, "/"+directoryName), write)
 }
@@ -92,6 +97,9 @@ func (fileMetadata *FileMetadata) PathExists(path string) bool {
 	fileName := pathSplit[len(pathSplit)-1]
 	directoryPath := strings.Replace(path, fileName, "", -1)
 	directoryNode := getNode(fileMetadata.rootNode, directoryPath, false)
+	if directoryNode == nil {
+		return false
+	}
 	_, ok := directoryNode.files[fileName]
 	if ok {
 		return true

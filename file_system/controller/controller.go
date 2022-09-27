@@ -5,6 +5,7 @@ import (
 	"P1-go-distributed-file-system/file_metadata"
 	file_io "P1-go-distributed-file-system/files_io"
 	"log"
+	"time"
 )
 
 type Controller struct {
@@ -104,10 +105,12 @@ func (controller *Controller) uploadHandler(connectionHandler *connection.Connec
 	// 9. When N number of storage nodes respond back with ack of file then set status to Complete
 	// end.
 
-	filepath := message.GetData()
-	checksum := message.GetChecksum()
-	chunks := ProtoToChunk(message.GetChunk())
+	filepath := message.GetPath()
+	if filepath == "" {
+		// TODO send error back to client
+	}
 	exists := controller.fileMetadata.PathExists(filepath)
+
 	if exists {
 		err := file_io.SendError(connectionHandler, "File already exists")
 		if err != nil {
@@ -115,7 +118,10 @@ func (controller *Controller) uploadHandler(connectionHandler *connection.Connec
 		}
 		return
 	}
-	err := file_io.SendAck(connectionHandler)
+	err := file_io.SendMessage(connectionHandler, connection.MessageType_PUT)
+	time.Sleep(time.Second * 10)
+	checksum := message.GetChecksum()
+	chunks := ProtoToChunk(message.GetChunk())
 	if err != nil {
 		log.Println("Unable to send ack to client that file path does not exist")
 	}

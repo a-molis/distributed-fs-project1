@@ -5,6 +5,7 @@ import (
 	"P1-go-distributed-file-system/connection"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 )
 
@@ -17,6 +18,11 @@ type Client struct {
 	controllerHost    string
 	controllerPort    int
 	connectionHandler *connection.ConnectionHandler
+}
+
+type chunkMeta struct {
+	name string
+	size int
 }
 
 func NewClient(config *Config, controllerHost string, controllerPort int, command string, args ...string) *Client {
@@ -53,6 +59,7 @@ func (client *Client) Start() {
 			log.Fatalln("Missing arguments")
 		}
 		client.remotePath = client.args[0]
+		message.Path = client.remotePath
 		if messageType == connection.MessageType_GET || messageType == connection.MessageType_PUT {
 			if len(client.args) < 2 {
 				log.Fatalln("Missing local path for get or put")
@@ -73,6 +80,7 @@ func (client *Client) Start() {
 }
 
 func (client *Client) sendToController(err error, message *connection.FileData, connectionHandler *connection.ConnectionHandler) {
+	// TODO refactor to immediately enter method for specific messageType
 	err = client.connectionHandler.Send(message)
 	if err != nil {
 		log.Fatalln("Error sending data to controller")
@@ -106,6 +114,8 @@ func (client *Client) ls(result *connection.FileData, connectionHandler *connect
 }
 
 func (client *Client) put(result *connection.FileData, connectionHandler *connection.ConnectionHandler) {
+	chunkMetaMap, err := client.getChunkMeta()
+
 	fileExists, err := connectionHandler.Receive()
 	if err != nil {
 		log.Fatalln("Error getting data from controller on client")
@@ -115,4 +125,35 @@ func (client *Client) put(result *connection.FileData, connectionHandler *connec
 	} else if fileExists.MessageType != connection.MessageType_ACK {
 		log.Fatalln("Received invalid message from controller on client put")
 	}
+}
+
+func (client *Client) getChunkMeta() (map[string]*chunkMeta, error) {
+	fileSize := getFileSize(client.localPath)
+	numChunks := int(fileSize) / client.config.ChunkSize
+	chunkMap := make(map[string]*chunkMeta)
+	filePrefix := strings.Replace(strings.TrimPrefix(client.remotePath, "/"), "/", "_", -1)
+	for i := 0; i < numChunks; i++ {
+		chunkName := fmt.Sprintf("%s_%d", filePrefix, i)
+		chunkMeta := &chunkMeta{}
+		chunkMeta.size = client.config.ChunkSize
+		chunkMeta.name = chunkName
+		chunkMap[chunkName] = chunkMeta
+	}
+	remainingSize := int(fileSize) % client.config.ChunkSize
+	if remainingSize != 0 {
+		lastChunkName := fmt.Sprintf("%s_%d", filePrefix, numChunks)
+		chunkMeta := &chunkMeta{}
+		chunkMeta.size = remainingSize
+		chunkMeta.name = lastChunkName
+		chunkMap[lastChunkName] = chunkMeta
+	}
+	return chunkMap, nil
+}
+
+func getFileSize(path string) int64 {
+	fileStat, err := os.Stat(path)
+	if err != nil {
+		log.Fatalf("Error getting file stat for %s\n%s\n", path, err)
+	}
+	return fileStat.Size()
 }

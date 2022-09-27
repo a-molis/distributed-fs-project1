@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-func OpenFile(path string) ([]byte, error) {
+func ReadFile(path string) ([]byte, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		log.Printf("Unable to open file %s\n", path)
@@ -44,6 +44,17 @@ func SendAck(connectionHandler *connection.ConnectionHandler) error {
 	err := connectionHandler.Send(sendAck)
 	if err != nil {
 		log.Println("Error sending Ack message ")
+		return err
+	}
+	return nil
+}
+
+func SendMessage(handler *connection.ConnectionHandler, messageType connection.MessageType) error {
+	message := &connection.FileData{}
+	message.MessageType = messageType
+	err := handler.Send(message)
+	if err != nil {
+		log.Println("Error sending message of type ", messageType)
 		return err
 	}
 	return nil
