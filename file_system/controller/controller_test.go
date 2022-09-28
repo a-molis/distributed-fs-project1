@@ -1,36 +1,42 @@
 package controller
 
 import (
+	"P1-go-distributed-file-system/config"
 	"P1-go-distributed-file-system/storage"
 	"testing"
 	"time"
 )
 
 func TestController(t *testing.T) {
-
-	var port int = 12020
-	host := "localhost"
-
 	testId := "storageTestId"
+	var storagePort0 int32 = 12041
 
 	var members []string
 
-	var size int32 = 10
+	var size int64 = 10
+
+	testConfig, err := config.ConfigFromPath("../config.json")
+	if err != nil {
+		t.Errorf("Unable to open config")
+		return
+	}
+	testConfig.ControllerHost = "localhost"
+	testConfig.ControllerPort = 12020
 
 	//bit for the controller
-	go func(port int, receivedMembers *[]string) {
-		controller := NewController("testId", host, port)
+	go func(receivedMembers *[]string) {
+		controller := NewController("testId", testConfig.ControllerHost, testConfig.ControllerPort, testConfig)
 		controller.Start()
 		time.Sleep(time.Second * 3)
 		*receivedMembers = controller.List()
-	}(port, &members)
+	}(&members)
 
 	time.Sleep(time.Second * 1)
 
-	go func(port int, id string) {
-		storageNode := storage.NewStorageNode(id, size, "localHost", port)
+	go func(id string) {
+		storageNode := storage.NewStorageNode(id, size, "localHost", storagePort0, testConfig)
 		storageNode.Start()
-	}(port, testId)
+	}(testId)
 
 	time.Sleep(time.Second * 6)
 
@@ -42,31 +48,36 @@ func TestController(t *testing.T) {
 }
 
 func TestHeartBeatInactive(t *testing.T) {
-
-	var port int = 12021
-	host := "localhost"
-
 	testId := "storageTestId"
+	var storagePort0 int32 = 12038
 
 	var members []string
 
-	var size int32 = 10
+	var size int64 = 10
+
+	testConfig, err := config.ConfigFromPath("../config.json")
+	if err != nil {
+		t.Errorf("Unable to open config")
+		return
+	}
+	testConfig.ControllerHost = "localhost"
+	testConfig.ControllerPort = 12021
 
 	//bit for the controller
-	go func(port int, receivedMembers *[]string) {
-		controller := NewController("testId", host, port)
+	go func(receivedMembers *[]string) {
+		controller := NewController("testId", testConfig.ControllerHost, testConfig.ControllerPort, testConfig)
 		controller.Start()
 		time.Sleep(time.Second * 15)
 		*receivedMembers = controller.List()
-	}(port, &members)
+	}(&members)
 
 	time.Sleep(time.Second * 1)
 
-	go func(port int, id string) {
-		storageNode := storage.NewStorageNode(id, size, "localHost", port)
+	go func(id string) {
+		storageNode := storage.NewStorageNode(id, size, "localHost", storagePort0, testConfig)
 		storageNode.Start()
 		storageNode.Shutdown()
-	}(port, testId)
+	}(testId)
 
 	time.Sleep(time.Second * 20)
 
@@ -78,30 +89,35 @@ func TestHeartBeatInactive(t *testing.T) {
 }
 
 func TestHeartBeat(t *testing.T) {
-
-	var port int = 12022
-	host := "localhost"
-
 	testId := "storageTestId"
+	var storagePort0 int32 = 12037
 
 	var members []string
 
-	var size int32 = 10
+	var size int64 = 10
+
+	testConfig, err := config.ConfigFromPath("../config.json")
+	if err != nil {
+		t.Errorf("Unable to open config")
+		return
+	}
+	testConfig.ControllerHost = "localhost"
+	testConfig.ControllerPort = 12022
 
 	//bit for the controller
-	go func(port int, receivedMembers *[]string) {
-		controller := NewController("testId", host, port)
+	go func(receivedMembers *[]string) {
+		controller := NewController("testId", testConfig.ControllerHost, testConfig.ControllerPort, testConfig)
 		controller.Start()
 		time.Sleep(time.Second * 15)
 		*receivedMembers = controller.List()
-	}(port, &members)
+	}(&members)
 
 	time.Sleep(time.Second * 1)
 
-	go func(port int, id string) {
-		storageNode := storage.NewStorageNode(id, size, "localHost", port)
+	go func( id string) {
+		storageNode := storage.NewStorageNode(id, size, "localHost", storagePort0, testConfig)
 		storageNode.Start()
-	}(port, testId)
+	}(testId)
 
 	time.Sleep(time.Second * 20)
 
@@ -113,38 +129,44 @@ func TestHeartBeat(t *testing.T) {
 }
 
 func TestHeartBeatMultiNode(t *testing.T) {
-
-	var port int = 12023
-	host := "localhost"
-
 	testId := "storageTestId"
 	testId2 := "storageTestId2"
+	var storagePort0 int32 = 12039
+	var storagePort1 int32 = 12040
 
 	var members []string
 
-	var size int32 = 10
+	var size int64 = 10
+
+	testConfig, err := config.ConfigFromPath("../config.json")
+	if err != nil {
+		t.Errorf("Unable to open config")
+		return
+	}
+	testConfig.ControllerHost = "localhost"
+	testConfig.ControllerPort = 12023
 
 	//bit for the controller
-	go func(port int, receivedMembers *[]string) {
-		controller := NewController("testId", host, port)
+	go func(receivedMembers *[]string) {
+		controller := NewController("testId", testConfig.ControllerHost, testConfig.ControllerPort, testConfig)
 		controller.Start()
 		time.Sleep(time.Second * 20)
 		*receivedMembers = controller.List()
-	}(port, &members)
+	}(&members)
 
 	time.Sleep(time.Second * 1)
 
-	go func(port int, id string) {
-		storageNode := storage.NewStorageNode(id, size, "localHost", port)
+	go func(id string) {
+		storageNode := storage.NewStorageNode(id, size, "localHost", storagePort0, testConfig)
 		storageNode.Start()
 		time.Sleep(time.Second * 1)
 		storageNode.Shutdown()
-	}(port, testId)
+	}(testId)
 
-	go func(port int, id string) {
-		storageNode := storage.NewStorageNode(id, size, "localHost", port)
+	go func(id string) {
+		storageNode := storage.NewStorageNode(id, size, "localHost", storagePort1, testConfig)
 		storageNode.Start()
-	}(port, testId2)
+	}(testId2)
 
 	time.Sleep(time.Second * 25)
 

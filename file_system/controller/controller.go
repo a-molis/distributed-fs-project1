@@ -1,11 +1,12 @@
 package controller
 
 import (
+	. "P1-go-distributed-file-system/config"
 	"P1-go-distributed-file-system/connection"
 	"P1-go-distributed-file-system/file_metadata"
 	file_io "P1-go-distributed-file-system/files_io"
 	"log"
-	"time"
+	"math/big"
 )
 
 type Controller struct {
@@ -16,9 +17,10 @@ type Controller struct {
 	memberTable  *MemberTable
 	fileMetadata *file_metadata.FileMetadata
 	running      bool
+	config       *Config
 }
 
-func NewController(id string, host string, port int) *Controller {
+func NewController(id string, host string, port int, config *Config) *Controller {
 	controller := &Controller{}
 	controller.id = id
 	controller.port = port
@@ -26,6 +28,7 @@ func NewController(id string, host string, port int) *Controller {
 	controller.running = true
 	controller.host = host
 	controller.fileMetadata = file_metadata.NewFileMetaData()
+	controller.config = config
 	return controller
 }
 
@@ -45,7 +48,8 @@ func (controller *Controller) listen() {
 }
 
 func (controller *Controller) handleConnection(connectionHandler *connection.ConnectionHandler) {
-	connectionChan := make(chan *connection.FileData)
+	lsChan := make(chan *connection.FileData)
+	putChan := make(chan *connection.FileData)
 	for controller.running {
 		message, err := connectionHandler.Receive()
 		if err != nil {
@@ -56,11 +60,13 @@ func (controller *Controller) handleConnection(connectionHandler *connection.Con
 		} else if message.MessageType == connection.MessageType_HEARTBEAT {
 			go controller.heartbeatHandler(connectionHandler, message)
 		} else if message.MessageType == connection.MessageType_LS {
-			go controller.ls(connectionHandler, connectionChan, message)
+			go controller.ls(connectionHandler, lsChan, message)
 		} else if message.MessageType == connection.MessageType_ACK_LS {
-			connectionChan <- message
+			lsChan <- message
 		} else if message.MessageType == connection.MessageType_PUT {
-			go controller.uploadHandler(connectionHandler, message)
+			go controller.uploadHandler(connectionHandler, putChan, message)
+		} else if message.MessageType == connection.MessageType_ACK_PUT {
+			putChan <- message
 		}
 	}
 }
@@ -71,7 +77,8 @@ func (controller *Controller) shutdown() {
 
 func (controller *Controller) registerHandler(connectionHandler *connection.ConnectionHandler, message *connection.FileData) {
 	log.Println("Received registration message from ", message.SenderId)
-	err := controller.memberTable.Register(message.SenderId)
+	size := new(big.Int).SetBytes(message.Size)
+	err := controller.memberTable.Register(message.SenderId, size, message.Node.Hostname, message.Node.Port)
 	if err == nil {
 		ack := &connection.FileData{}
 		ack.MessageType = connection.MessageType_ACK
@@ -82,6 +89,7 @@ func (controller *Controller) registerHandler(connectionHandler *connection.Conn
 }
 
 func (controller *Controller) heartbeatHandler(connectionHandler *connection.ConnectionHandler, message *connection.FileData) {
+	log.Println("Received heart beat from ", message.SenderId)
 	controller.memberTable.RecordBeat(message.SenderId)
 }
 
@@ -89,7 +97,7 @@ func (controller *Controller) List() []string {
 	return controller.memberTable.List()
 }
 
-func (controller *Controller) uploadHandler(connectionHandler *connection.ConnectionHandler, message *connection.FileData) {
+func (controller *Controller) uploadHandler(connectionHandler *connection.ConnectionHandler, connectionChan <-chan *connection.FileData, message *connection.FileData) {
 	// TODO add logic
 	// 1. client connect and requests to upload chunks and names of chunks
 	// filename, chunk name, chunk size, overall checksum, chunk checksum
@@ -119,17 +127,14 @@ func (controller *Controller) uploadHandler(connectionHandler *connection.Connec
 		return
 	}
 	err := file_io.SendMessage(connectionHandler, connection.MessageType_PUT)
-	time.Sleep(time.Second * 10)
-	checksum := message.GetChecksum()
-	chunks := ProtoToChunk(message.GetChunk())
-	if err != nil {
-		log.Println("Unable to send ack to client that file path does not exist")
-	}
-	err = findAvailableNodes(chunks, controller.memberTable)
+	chunkData := <-connectionChan
+	chunks := ProtoToChunk(chunkData.GetChunk())
+
+	err = findAvailableNodes(chunks, controller.memberTable, controller.config.NumReplicas)
 	if err != nil {
 		log.Println("could  not assign nodes to chunks, ", err)
 	}
-	err = controller.fileMetadata.UploadChunks(filepath, chunks, checksum)
+	err = controller.fileMetadata.UploadChunks(filepath, chunks)
 	if err != nil {
 		log.Println("could  not upload chunks to filetree, ", err)
 	}

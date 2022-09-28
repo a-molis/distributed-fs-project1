@@ -12,42 +12,52 @@ import (
 
 func TestBasicClient(t *testing.T) {
 
-	var port int = 12024
-	host := "localhost"
+	controllerHost := "localhost"
+	storageHost := "localhost"
+	var storagePort0 int32 = 12032
+	var storagePort1 int32 = 12033
 
 	testId := "storageTestId"
 	testId2 := "storageTestId2"
 
 	var members []string
 
-	var size int32 = 10
+	// Chunk size is in bytes, storage node size in MB
+	var chunkSize int64 = 5000000
+	var storageSize int64 = 1000000
 
-	//bit for the controller
-	go func(port int, receivedMembers *[]string) {
-		testController := controller.NewController("testId", host, port)
+	testConfig, err := config.ConfigFromPath("../config.json")
+	if err != nil {
+		t.Errorf("Unable to open config")
+		return
+	}
+	testConfig.ChunkSize = chunkSize
+	testConfig.ControllerPort = 12031
+
+	go func(receivedMembers *[]string) {
+		testController := controller.NewController("testId", controllerHost, testConfig.ControllerPort, testConfig)
 		testController.Start()
 		time.Sleep(time.Second * 1)
 		*receivedMembers = testController.List()
-	}(port, &members)
+	}(&members)
 
 	time.Sleep(time.Second * 1)
 
-	go func(port int, id string) {
-		storageNode := storage.NewStorageNode(id, size, "localHost", port)
+	go func(id string) {
+		storageNode := storage.NewStorageNode(testId, storageSize, storageHost, storagePort0, testConfig)
 		storageNode.Start()
 		time.Sleep(time.Second * 1)
-	}(port, testId)
+	}(testId)
 
-	go func(port int, id string) {
-		storageNode := storage.NewStorageNode(id, size, "localHost", port)
+	go func(id string) {
+		storageNode := storage.NewStorageNode(testId2, storageSize, storageHost, storagePort1, testConfig)
 		storageNode.Start()
-	}(port, testId2)
+	}(testId2)
 
-	go func(port int, id string) {
-		clientConfig := &config.Config{}
-		testClient := NewClient(clientConfig, "localHost", port, "ls")
+	go func(id string) {
+		testClient := NewClient(testConfig, "ls")
 		testClient.Start()
-	}(port, testId2)
+	}(testId2)
 	time.Sleep(time.Second * 5)
 
 	if 1 != 1 {
@@ -58,49 +68,82 @@ func TestBasicClient(t *testing.T) {
 }
 
 func TestClientUpload(t *testing.T) {
+	controllerHost := "localhost"
+	storageHost := "localhost"
+	controllerPort := 12027
+	var storagePort0 int32 = 12028
+	var storagePort1 int32 = 12029
+	var storagePort2 int32 = 12034
+	var storagePort3 int32 = 12035
+	var storagePort4 int32 = 12036
+	var size int64 = 1000000
+	var chunkSize int64 = 5000000
 
-	var port int = 12026
-	host := "localhost"
-	chunkSize := 5
+	testConfig, err := config.ConfigFromPath("../config.json")
+	if err != nil {
+		t.Errorf("Unable to open config")
+		return
+	}
+	testConfig.ChunkSize = chunkSize
+	testConfig.ControllerHost = controllerHost
+	testConfig.ControllerPort = controllerPort
+
 	uploadPath := "/this/test/path/foo.txt"
 	localPath := "testdata/testFile.txt"
 
-	testId := "storageTestId0"
-	testId2 := "storageTestId1"
+	testStorageNode0 := "testStorageNode0"
+	testStorageNode1 := "testStorageNode1"
+	testStorageNode2 := "testStorageNode2"
+	testStorageNode3 := "testStorageNode3"
+	testStorageNode4 := "testStorageNode4"
+	testClientId0 := "clientId0"
 
 	var members []string
 
-	var size int32 = 10
-
-	go func(port int, receivedMembers *[]string) {
-		testController := controller.NewController("testId", host, port)
+	go func(controllerPort int, receivedMembers *[]string) {
+		testController := controller.NewController("testId", controllerHost, controllerPort, testConfig)
 		testController.Start()
 		time.Sleep(time.Second * 1)
 		*receivedMembers = testController.List()
-	}(port, &members)
+	}(controllerPort, &members)
 
 	time.Sleep(time.Second * 1)
 
-	go func(port int, id string) {
-		storageNode := storage.NewStorageNode(id, size, "localHost", port)
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode0, size, storageHost, storagePort0, testConfig)
 		storageNode.Start()
 		time.Sleep(time.Second * 1)
-	}(port, testId)
+	}()
 
-	go func(port int, id string) {
-		storageNode := storage.NewStorageNode(id, size, "localHost", port)
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode1, size, storageHost, storagePort1, testConfig)
 		storageNode.Start()
-	}(port, testId2)
+	}()
 
-	go func(port int, id string) {
-		clientConfig := &config.Config{}
-		clientConfig.ChunkSize = chunkSize
-		testClient := NewClient(clientConfig, host, port, "put", uploadPath, localPath)
-		testClient.Start()
-	}(port, testId2)
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode2, size, storageHost, storagePort2, testConfig)
+		storageNode.Start()
+	}()
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode3, size, storageHost, storagePort3, testConfig)
+		storageNode.Start()
+	}()
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode4, size, storageHost, storagePort4, testConfig)
+		storageNode.Start()
+	}()
 
 	time.Sleep(time.Second * 3)
+	go func(port int, id string) {
+		testClient := NewClient(testConfig, "put", uploadPath, localPath)
+		testClient.Start()
+	}(controllerPort, testClientId0)
 
+	time.Sleep(time.Second * 2)
+
+	// TODO complete test to validate file is saved
 	if 1 != 1 {
 		t.Fatalf("the registered node id doesnt match %s", members[0])
 	}

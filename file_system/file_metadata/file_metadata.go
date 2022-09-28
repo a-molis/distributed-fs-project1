@@ -32,7 +32,7 @@ func (fileMetadata *FileMetadata) upload(path string) error {
 	return nil
 }
 
-func (fileMetadata *FileMetadata) UploadChunks(path string, chunks []*Chunk, checksum int32) error {
+func (fileMetadata *FileMetadata) UploadChunks(path string, chunks []*Chunk) error {
 	pathSplit := strings.Split(path, "/")
 	fileName := pathSplit[len(pathSplit)-1]
 	directoryPath := strings.Replace(path, fileName, "", -1)
@@ -46,7 +46,6 @@ func (fileMetadata *FileMetadata) UploadChunks(path string, chunks []*Chunk, che
 	file.Name = fileName
 	file.Status = Pending
 	file.Chunks = chunks
-	file.Checksum = checksum
 	file.PendingChunks = len(chunks)
 	directoryNode.files[fileName] = file
 	return nil
@@ -146,7 +145,7 @@ type File struct {
 
 type Chunk struct {
 	Name         string
-	Size         int32
+	Size         int64
 	Checksum     int32
 	Status       Status
 	StorageNodes []string

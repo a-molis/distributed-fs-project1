@@ -22,16 +22,23 @@ type Client struct {
 
 type chunkMeta struct {
 	name string
-	size int
+	size int64
+	Nodes []*connection.Node
 }
 
-func NewClient(config *Config, controllerHost string, controllerPort int, command string, args ...string) *Client {
+type Node struct {
+	Id       string
+	Hostname string
+	Port     int32
+}
+
+func NewClient(config *Config, command string, args ...string) *Client {
 	client := &Client{}
 	client.config = config
 	client.command = command
 	client.args = args
-	client.controllerHost = controllerHost
-	client.controllerPort = controllerPort
+	client.controllerHost = config.ControllerHost
+	client.controllerPort = config.ControllerPort
 	return client
 }
 
@@ -98,6 +105,8 @@ func (client *Client) sendToController(err error, message *connection.FileData, 
 	} else if result.MessageType == connection.MessageType_PUT {
 		log.Println("Client received put message")
 		client.put(result, connectionHandler)
+	} else if result.MessageType == connection.MessageType_ERROR {
+		log.Fatalln("Error from controller: ", result.Data)
 	} else {
 		log.Fatalln("Error client unable to get result from controller")
 	}
@@ -115,21 +124,19 @@ func (client *Client) ls(result *connection.FileData, connectionHandler *connect
 
 func (client *Client) put(result *connection.FileData, connectionHandler *connection.ConnectionHandler) {
 	chunkMetaMap, err := client.getChunkMeta()
-
-	fileExists, err := connectionHandler.Receive()
 	if err != nil {
-		log.Fatalln("Error getting data from controller on client")
+		log.Fatalln("Error getting chunk data from file on client ", err)
 	}
-	if fileExists.MessageType == connection.MessageType_ERROR {
-		log.Fatalln("Path on remote file system already exists")
-	} else if fileExists.MessageType != connection.MessageType_ACK {
-		log.Fatalln("Received invalid message from controller on client put")
+	err = client.sendChunkInfoController(connectionHandler, chunkMetaMap)
+	if err != nil {
+		log.Fatalln("Error sending chunk info from client to server ", err)
 	}
+
 }
 
 func (client *Client) getChunkMeta() (map[string]*chunkMeta, error) {
 	fileSize := getFileSize(client.localPath)
-	numChunks := int(fileSize) / client.config.ChunkSize
+	numChunks := int(fileSize / client.config.ChunkSize)
 	chunkMap := make(map[string]*chunkMeta)
 	filePrefix := strings.Replace(strings.TrimPrefix(client.remotePath, "/"), "/", "_", -1)
 	for i := 0; i < numChunks; i++ {
@@ -139,7 +146,7 @@ func (client *Client) getChunkMeta() (map[string]*chunkMeta, error) {
 		chunkMeta.name = chunkName
 		chunkMap[chunkName] = chunkMeta
 	}
-	remainingSize := int(fileSize) % client.config.ChunkSize
+	remainingSize := fileSize % client.config.ChunkSize
 	if remainingSize != 0 {
 		lastChunkName := fmt.Sprintf("%s_%d", filePrefix, numChunks)
 		chunkMeta := &chunkMeta{}
@@ -148,6 +155,42 @@ func (client *Client) getChunkMeta() (map[string]*chunkMeta, error) {
 		chunkMap[lastChunkName] = chunkMeta
 	}
 	return chunkMap, nil
+}
+
+func (client *Client) sendChunkInfoController(handler *connection.ConnectionHandler, chunkMap map[string]*chunkMeta) error {
+	fileData := &connection.FileData{}
+	fileData.MessageType = connection.MessageType_ACK_PUT
+	protoChunks := make([]*connection.Chunk, len(chunkMap))
+	index := 0
+	for _, chunk := range chunkMap {
+		protoChunk := clientChunkToProto(chunk)
+		protoChunks[index] = protoChunk
+		index++
+	}
+	fileData.Chunk = protoChunks
+	err := handler.Send(fileData)
+	if err != nil {
+		return err
+	}
+	message, err := handler.Receive()
+	if err != nil {
+		return err
+	}
+	for _, protoChunk := range message.Chunk {
+		initialChunk, ok := chunkMap[protoChunk.Name]
+		if !ok {
+			log.Fatalln("Error getting chunk data from controller on client")
+		}
+		initialChunk.Nodes = protoChunk.Nodes
+	}
+	return nil
+}
+
+func clientChunkToProto(chunkMeta *chunkMeta) *connection.Chunk {
+	protoChunk := &connection.Chunk{}
+	protoChunk.Name = chunkMeta.name
+	protoChunk.Size = chunkMeta.size
+	return protoChunk
 }
 
 func getFileSize(path string) int64 {

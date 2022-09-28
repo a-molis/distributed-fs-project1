@@ -7,7 +7,10 @@ import (
 )
 
 type Config struct {
-	ChunkSize int `json:"chunk_size"`
+	ChunkSize   int64 `json:"chunk_size"`
+	NumReplicas int `json:"num_replicas"`
+	ControllerHost string `json:"controller_host"`
+	ControllerPort int `json:"controller_port"`
 }
 
 func ConfigFromPath(path string) (*Config, error) {

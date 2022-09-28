@@ -11,16 +11,18 @@ enum MessageType {
     HEARTBEAT = 6;
     ACK_LS = 7;
     ERROR = 8;
+    ACK_PUT = 9;
 }
 
 message FileData {
     MessageType messageType = 1;
     string path = 2;
-    int32 size = 3;
+    bytes size = 3;
     string data = 4;
     int32 checksum = 5;
     string senderId = 6;
     repeated Chunk chunk = 7;
+    Node node = 8;
 }
 
 message Node {
@@ -31,7 +33,7 @@ message Node {
 
 message Chunk {
     string name = 1;
-    int32 size = 2;
+    int64 size = 2;
     int32 checksum = 3;
     repeated Node nodes = 4;
 }
