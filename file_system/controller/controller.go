@@ -6,7 +6,6 @@ import (
 	"dfs/connection"
 	"dfs/file_metadata"
 	file_io "dfs/files_io"
-	"flag"
 	"io/ioutil"
 	"log"
 	"math/big"
@@ -38,7 +37,7 @@ func NewController(id string, config *Config) *Controller {
 
 func (controller *Controller) Start() {
 	controller.server = connection.NewServer(controller.host, controller.port)
-	go controller.listen()
+	controller.listen()
 }
 
 func (controller *Controller) listen() {
@@ -207,14 +206,4 @@ func (controller *Controller) LoadFileMetadata() error {
 		controller.fileMetadata.LoadBytes(bytes)
 	}
 	return err
-}
-
-func main() {
-	configFile, err := ConfigFromPath("../config.json")
-	if err != nil {
-		log.Fatalln("Failed to open config on controller ", err)
-	}
-	id := flag.String("id", "", "The identifier of the controller")
-	controller := NewController(*id, configFile)
-	controller.Start()
 }
