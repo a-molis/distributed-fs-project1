@@ -1,8 +1,8 @@
 package client
 
 import (
-	. "P1-go-distributed-file-system/config"
-	"P1-go-distributed-file-system/connection"
+	. "dfs/config"
+	"dfs/connection"
 	"fmt"
 	"log"
 	"os"

@@ -1,9 +1,9 @@
 package client
 
 import (
-	"P1-go-distributed-file-system/config"
-	"P1-go-distributed-file-system/controller"
-	"P1-go-distributed-file-system/storage"
+	"dfs/config"
+	"dfs/controller"
+	"dfs/storage"
 	"testing"
 	"time"
 )

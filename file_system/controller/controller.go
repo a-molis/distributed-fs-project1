@@ -1,11 +1,11 @@
 package controller
 
 import (
-	. "P1-go-distributed-file-system/config"
-	"P1-go-distributed-file-system/connection"
-	"P1-go-distributed-file-system/file_metadata"
-	"P1-go-distributed-file-system/files_io"
 	"bufio"
+	. "dfs/config"
+	"dfs/connection"
+	"dfs/file_metadata"
+	file_io "dfs/files_io"
 	"flag"
 	"io/ioutil"
 	"log"

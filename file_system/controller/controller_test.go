@@ -1,8 +1,8 @@
 package controller
 
 import (
-	"P1-go-distributed-file-system/config"
-	"P1-go-distributed-file-system/storage"
+	"dfs/config"
+	"dfs/storage"
 	"testing"
 	"time"
 )

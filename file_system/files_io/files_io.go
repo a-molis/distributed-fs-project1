@@ -1,7 +1,7 @@
 package file_io
 
 import (
-	"P1-go-distributed-file-system/connection"
+	"dfs/connection"
 	"io/ioutil"
 	"log"
 	"os"
