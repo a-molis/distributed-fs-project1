@@ -7,22 +7,34 @@ import (
 
 func TestUpload(t *testing.T) {
 	fmdt := NewFileMetaData()
-	fmdt.upload("/foo/path/somedir/file.txt")
-	fmdt.upload("/foo/path/file.txt")
-	fmdt.upload("/foo/path/somedir/file2.txt")
-
-	fmt.Println(fmdt.ls("/"))
-	if fmdt.ls("/") != "foo" {
-		t.Fatalf("incorrect ls result /")
+	err := fmdt.Upload("/foo/path/somedir/file.txt")
+	if err != nil {
+		fmt.Println("error uploading")
+	}
+	err = fmdt.Upload("/foo/path/file.txt")
+	if err != nil {
+		fmt.Println("error uploading")
+	}
+	err = fmdt.Upload("/foo/path/somedir/someotherdir/file2.txt")
+	if err != nil {
+		fmt.Println("error uploading")
 	}
 
-	fmt.Println(fmdt.ls("/foo/"))
-	if fmdt.ls("/foo/") != "path" {
-		t.Fatalf("incorrect ls result foo")
+	s1 := fmdt.Ls("/")
+	fmt.Println(s1)
+	if s1 != "foo" {
+		t.Fatalf("incorrect ls result / %s", s1)
 	}
 
-	fmt.Println(fmdt.ls("/foo/path/somedir/"))
-	if fmdt.ls("/foo/path/somedir/") != "file.txt file2.txt" {
-		t.Fatalf("incorrect ls result somedir")
+	s2 := fmdt.Ls("/foo/")
+	fmt.Println(s2)
+	if s2 != "path" {
+		t.Fatalf("incorrect ls result foo %s", s2)
+	}
+
+	s3 := fmdt.Ls("/foo/path/somedir/someotherdir/")
+	fmt.Println(s3)
+	if s3 != "file2.txt" {
+		t.Fatalf("incorrect ls result somedir %s", s3)
 	}
 }

@@ -176,3 +176,39 @@ func TestHeartBeatMultiNode(t *testing.T) {
 
 	return
 }
+
+func TestSaveFileMetadata(t *testing.T) {
+
+	var file string
+
+	testConfig, err := config.ConfigFromPath("../config.json")
+	if err != nil {
+		t.Errorf("Unable to open config")
+		return
+	}
+	testConfig.ControllerHost = "localhost"
+	testConfig.ControllerPort = 12041
+
+	//bit for the controller
+	go func(file *string) {
+		controller := NewController("testId", testConfig.ControllerHost, testConfig.ControllerPort, testConfig)
+		controller.Start()
+		controller.fileMetadata.Upload("/foo/something/file.txt")
+		controller.fileMetadata.Upload("/foo/something2/file2.txt")
+		controller.SaveFileMetadata()
+		controller.shutdown()
+		testConfig.ControllerPort = 12042
+		controller = NewController("testId", testConfig.ControllerHost, testConfig.ControllerPort, testConfig)
+		controller.Start()
+		controller.LoadFileMetadata()
+		*file = controller.fileMetadata.Ls("/foo/something/")
+	}(&file)
+
+	time.Sleep(time.Second * 6)
+
+	if file != "file.txt" {
+		t.Fatalf("loaded file metadata is incorrect, %s", file)
+	}
+
+	return
+}

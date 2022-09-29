@@ -4,9 +4,12 @@ import (
 	. "P1-go-distributed-file-system/config"
 	"P1-go-distributed-file-system/connection"
 	"P1-go-distributed-file-system/file_metadata"
-	file_io "P1-go-distributed-file-system/files_io"
+	"P1-go-distributed-file-system/files_io"
 	"log"
 	"math/big"
+	"bufio"
+	"io/ioutil"
+	"os"
 )
 
 type Controller struct {
@@ -60,7 +63,7 @@ func (controller *Controller) handleConnection(connectionHandler *connection.Con
 		} else if message.MessageType == connection.MessageType_HEARTBEAT {
 			go controller.heartbeatHandler(connectionHandler, message)
 		} else if message.MessageType == connection.MessageType_LS {
-			go controller.ls(connectionHandler, lsChan, message)
+			go controller.Ls(connectionHandler, lsChan, message)
 		} else if message.MessageType == connection.MessageType_ACK_LS {
 			lsChan <- message
 		} else if message.MessageType == connection.MessageType_PUT {
@@ -90,6 +93,9 @@ func (controller *Controller) registerHandler(connectionHandler *connection.Conn
 
 func (controller *Controller) heartbeatHandler(connectionHandler *connection.ConnectionHandler, message *connection.FileData) {
 	log.Println("Received heart beat from ", message.SenderId)
+	//TODO update file metadata with info that is passed in heartbeat
+		//^^ returns a boolean
+		//depending on boolean save file metadata
 	controller.memberTable.RecordBeat(message.SenderId)
 }
 
@@ -147,7 +153,7 @@ func (controller *Controller) uploadHandler(connectionHandler *connection.Connec
 	connectionHandler.Send(response)
 }
 
-func (controller *Controller) ls(handler *connection.ConnectionHandler, connectionChan <-chan *connection.FileData, message *connection.FileData) {
+func (controller *Controller) Ls(handler *connection.ConnectionHandler, connectionChan <-chan *connection.FileData, message *connection.FileData) {
 	sendMessage := &connection.FileData{}
 	sendMessage.MessageType = connection.MessageType_LS
 
@@ -162,4 +168,42 @@ func (controller *Controller) ls(handler *connection.ConnectionHandler, connecti
 		// TODO retry if need to
 		log.Println("Invalid ack for controller ls")
 	}
+}
+
+func (controller *Controller) SaveFileMetadata() {
+	bytes, err := controller.fileMetadata.GetBytes()
+	if err != nil {
+		log.Println("Error converting filemetadata to bytes")
+		return
+	}
+	file, err := os.Create("./fmdt")
+	defer file.Close()
+	if err != nil {
+		log.Println("Error opening file fmdt")
+		return
+	}
+	writer := bufio.NewWriter(file)
+	_, err = writer.Write(bytes)
+	if err != nil {
+		log.Println("Error writing to file fmdt", err)
+		return
+	}
+	err = writer.Flush()
+	if err != nil {
+		log.Println("Error flushing writer to file fmdt")
+		return
+	}
+}
+
+func (controller *Controller) LoadFileMetadata() error {
+	file, err := os.Open("./fmdt")
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	bytes, err := ioutil.ReadAll(file)
+	if err == nil {
+		controller.fileMetadata.LoadBytes(bytes)
+	}
+	return err
 }
