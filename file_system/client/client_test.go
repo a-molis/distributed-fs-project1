@@ -33,9 +33,10 @@ func TestBasicClient(t *testing.T) {
 	}
 	testConfig.ChunkSize = chunkSize
 	testConfig.ControllerPort = 12031
+	testConfig.ControllerHost = controllerHost
 
 	go func(receivedMembers *[]string) {
-		testController := controller.NewController("testId", controllerHost, testConfig.ControllerPort, testConfig)
+		testController := controller.NewController("testId", testConfig)
 		testController.Start()
 		time.Sleep(time.Second * 1)
 		*receivedMembers = testController.List()
@@ -100,12 +101,12 @@ func TestClientUpload(t *testing.T) {
 
 	var members []string
 
-	go func(controllerPort int, receivedMembers *[]string) {
-		testController := controller.NewController("testId", controllerHost, controllerPort, testConfig)
+	go func(receivedMembers *[]string) {
+		testController := controller.NewController("testId", testConfig)
 		testController.Start()
 		time.Sleep(time.Second * 1)
 		*receivedMembers = testController.List()
-	}(controllerPort, &members)
+	}(&members)
 
 	time.Sleep(time.Second * 1)
 

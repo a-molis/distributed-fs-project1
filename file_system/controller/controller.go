@@ -5,10 +5,11 @@ import (
 	"P1-go-distributed-file-system/connection"
 	"P1-go-distributed-file-system/file_metadata"
 	"P1-go-distributed-file-system/files_io"
+	"bufio"
+	"flag"
+	"io/ioutil"
 	"log"
 	"math/big"
-	"bufio"
-	"io/ioutil"
 	"os"
 )
 
@@ -23,13 +24,13 @@ type Controller struct {
 	config       *Config
 }
 
-func NewController(id string, host string, port int, config *Config) *Controller {
+func NewController(id string, config *Config) *Controller {
 	controller := &Controller{}
 	controller.id = id
-	controller.port = port
+	controller.port = config.ControllerPort
 	controller.memberTable = NewMemberTable()
 	controller.running = true
-	controller.host = host
+	controller.host = config.ControllerHost
 	controller.fileMetadata = file_metadata.NewFileMetaData()
 	controller.config = config
 	return controller
@@ -206,4 +207,14 @@ func (controller *Controller) LoadFileMetadata() error {
 		controller.fileMetadata.LoadBytes(bytes)
 	}
 	return err
+}
+
+func main() {
+	configFile, err := ConfigFromPath("../config.json")
+	if err != nil {
+		log.Fatalln("Failed to open config on controller ", err)
+	}
+	id := flag.String("id", "", "The identifier of the controller")
+	controller := NewController(*id, configFile)
+	controller.Start()
 }

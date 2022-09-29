@@ -200,3 +200,7 @@ func getFileSize(path string) int64 {
 	}
 	return fileStat.Size()
 }
+
+func main() {
+
+}

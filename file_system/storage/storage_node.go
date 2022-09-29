@@ -83,3 +83,7 @@ func (storageNode *StorageNode) heartbeat() {
 		time.Sleep(heartBeatRate)
 	}
 }
+
+func main() {
+
+}
