@@ -3,6 +3,8 @@ package controller
 import (
 	"P1-go-distributed-file-system/connection"
 	"P1-go-distributed-file-system/file_metadata"
+	"errors"
+	"math/big"
 	"math/rand"
 )
 
@@ -44,20 +46,31 @@ func generateNodes(ids []string, memberTable *MemberTable) []*connection.Node {
 	return res
 }
 
-func findAvailableNodes(chunks []*file_metadata.Chunk, memberTable *MemberTable) error {
+// TODO move this to function in member table
+func findAvailableNodes(chunks []*file_metadata.Chunk, memberTable *MemberTable, numReplicas int) error {
 	listOfNodes := make([]string, 0)
+	if len(memberTable.members) < 1 {
+		err := errors.New("Erorr finding any available nodes member table empty")
+		if err != nil {
+			return err
+		}
+	}
 	for key := range memberTable.members {
 		listOfNodes = append(listOfNodes, key)
 	}
-
+	// TODO update so this throws an error instead
+	if numReplicas > len(memberTable.members) {
+		numReplicas = len(memberTable.members)
+	}
 	for _, chunk := range chunks {
 
-		for j:= 0; j < 3; {
+		// TODO handle case when storage nodes are full
+		for j := 0; j < numReplicas; {
 			idx := rand.Intn(len(listOfNodes))
-			if memberTable.members[listOfNodes[idx]].availableSize > chunk.Size && !contains(listOfNodes[idx], chunk.StorageNodes) {
+			if memberTable.members[listOfNodes[idx]].availableSize.Cmp(big.NewInt(chunk.Size)) >= 0 && !contains(listOfNodes[idx], chunk.StorageNodes) {
 				chunk.StorageNodes = append(chunk.StorageNodes, listOfNodes[idx])
 				member := memberTable.members[listOfNodes[idx]]
-				member.availableSize = member.availableSize - chunk.Size
+				member.availableSize.Set(member.availableSize.Sub(member.availableSize, big.NewInt(chunk.Size)))
 				memberTable.members[listOfNodes[idx]] = member
 				j++
 			}

@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"log"
+	"math/big"
 	"sync"
 	"time"
 )
@@ -15,9 +16,9 @@ type MemberTable struct {
 type Member struct {
 	status        bool
 	lastBeat      time.Time
-	availableSize int32
-	port int32 // TODO fill in this information
-	host string
+	availableSize *big.Int
+	port          int32
+	host          string
 }
 
 func NewMemberTable() *MemberTable {
@@ -29,11 +30,14 @@ func NewMemberTable() *MemberTable {
 	return memberTable
 }
 
-func (memberTable *MemberTable) Register(id string) error {
+func (memberTable *MemberTable) Register(id string, size *big.Int, host string, port int32) error {
 	memberTable.lock.Lock()
 	defer memberTable.lock.Unlock()
 	storageNode := Member{}
 	storageNode.status = true
+	storageNode.availableSize = size
+	storageNode.port = port
+	storageNode.host = host
 	if memberTable.members[id].status {
 		log.Printf("Member with id %s already exists", id)
 		return errors.New("storage node already registered")

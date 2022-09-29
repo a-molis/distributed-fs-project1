@@ -19,7 +19,8 @@ func (fileMetadata *FileMetadata) upload(path string) error {
 	pathSplit := strings.Split(path, "/")
 	fileName := pathSplit[len(pathSplit)-1]
 	directoryPath := strings.Replace(path, fileName, "", -1)
-	directoryNode := getNode(fileMetadata.rootNode, directoryPath)
+	directoryNode := getNode(fileMetadata.rootNode, directoryPath, true)
+	// TODO once getNode returns error add error handling
 	_, ok := directoryNode.files[fileName]
 	if ok {
 		return errors.New("file already exists")
@@ -31,11 +32,12 @@ func (fileMetadata *FileMetadata) upload(path string) error {
 	return nil
 }
 
-func (fileMetadata *FileMetadata) UploadChunks(path string, chunks []*Chunk, checksum int32) error {
+func (fileMetadata *FileMetadata) UploadChunks(path string, chunks []*Chunk) error {
 	pathSplit := strings.Split(path, "/")
 	fileName := pathSplit[len(pathSplit)-1]
 	directoryPath := strings.Replace(path, fileName, "", -1)
-	directoryNode := getNode(fileMetadata.rootNode, directoryPath)
+	directoryNode := getNode(fileMetadata.rootNode, directoryPath, true)
+	// TODO once getNode returns error add error handling
 	_, ok := directoryNode.files[fileName]
 	if ok {
 		return errors.New("file already exists")
@@ -44,13 +46,12 @@ func (fileMetadata *FileMetadata) UploadChunks(path string, chunks []*Chunk, che
 	file.Name = fileName
 	file.Status = Pending
 	file.Chunks = chunks
-	file.Checksum = checksum
 	file.PendingChunks = len(chunks)
 	directoryNode.files[fileName] = file
 	return nil
 }
 
-func getNode(node *Node, path string) *Node {
+func getNode(node *Node, path string, write bool) *Node {
 	if path == "/" {
 		return node
 	}
@@ -58,17 +59,22 @@ func getNode(node *Node, path string) *Node {
 	directoryName := pathSplit[1]
 	directoryNode, ok := node.dirs[directoryName]
 	if !ok {
-		node.dirs[directoryName] = newNode(directoryName)
-		directoryNode = node.dirs[directoryName]
+		if write {
+			node.dirs[directoryName] = newNode(directoryName)
+			directoryNode = node.dirs[directoryName]
+		} else {
+			// TODO refactor to return tuple with (*Node, error)
+			return nil
+		}
 	}
-	return getNode(directoryNode, strings.TrimPrefix(path, "/" + directoryName))
+	return getNode(directoryNode, strings.TrimPrefix(path, "/"+directoryName), write)
 }
 
 func (fileMetadata *FileMetadata) ls(path string) string {
-	directoryNode := getNode(fileMetadata.rootNode, path)
+	directoryNode := getNode(fileMetadata.rootNode, path, false)
 	res := ""
 	for dir := range directoryNode.dirs {
-	res = res + dir + " "
+		res = res + dir + " "
 	}
 	for file := range directoryNode.files {
 		res = res + file + " "
@@ -80,9 +86,38 @@ func (fileMetadata *FileMetadata) download(path string) []*Chunk {
 	pathSplit := strings.Split(path, "/")
 	fileName := pathSplit[len(pathSplit)-1]
 	directoryPath := strings.Replace(path, fileName, "", -1)
-	directoryNode := getNode(fileMetadata.rootNode, directoryPath)
+	directoryNode := getNode(fileMetadata.rootNode, directoryPath, false)
 	file := directoryNode.files[fileName]
 	return file.Chunks
+}
+
+func (fileMetadata *FileMetadata) PathExists(path string) bool {
+	pathSplit := strings.Split(path, "/")
+	fileName := pathSplit[len(pathSplit)-1]
+	directoryPath := strings.Replace(path, fileName, "", -1)
+	directoryNode := getNode(fileMetadata.rootNode, directoryPath, false)
+	if directoryNode == nil {
+		return false
+	}
+	_, ok := directoryNode.files[fileName]
+	if ok {
+		return true
+	}
+	return false
+}
+
+func (fileMetadata *FileMetadata) checkDirectoryNode(node *Node, path string) *Node {
+	if path == "/" {
+		return node
+	}
+	pathSplit := strings.Split(path, "/")
+	directoryName := pathSplit[1]
+	directoryNode, ok := node.dirs[directoryName]
+	if !ok {
+		node.dirs[directoryName] = newNode(directoryName)
+		directoryNode = node.dirs[directoryName]
+	}
+	return getNode(directoryNode, strings.TrimPrefix(path, "/"+directoryName), false)
 }
 
 type Node struct {
@@ -104,13 +139,13 @@ type File struct {
 	Name          string
 	Chunks        []*Chunk
 	Status        Status
-	Checksum	int32
+	Checksum      int32
 	PendingChunks int
 }
 
 type Chunk struct {
-	Name 		string
-	Size int32
+	Name         string
+	Size         int64
 	Checksum     int32
 	Status       Status
 	StorageNodes []string
