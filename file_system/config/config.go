@@ -1,7 +1,7 @@
 package config
 
 import (
-	"P1-go-distributed-file-system/files_io"
+	file_io "dfs/files_io"
 	"encoding/json"
 	"log"
 )

@@ -1,8 +1,8 @@
 package controller
 
 import (
-	"P1-go-distributed-file-system/config"
-	"P1-go-distributed-file-system/storage"
+	"dfs/config"
+	"dfs/storage"
 	"testing"
 	"time"
 )
@@ -25,8 +25,8 @@ func TestController(t *testing.T) {
 
 	//bit for the controller
 	go func(receivedMembers *[]string) {
-		controller := NewController("testId", testConfig.ControllerHost, testConfig.ControllerPort, testConfig)
-		controller.Start()
+		controller := NewController("testId", testConfig)
+		go controller.Start()
 		time.Sleep(time.Second * 3)
 		*receivedMembers = controller.List()
 	}(&members)
@@ -65,8 +65,8 @@ func TestHeartBeatInactive(t *testing.T) {
 
 	//bit for the controller
 	go func(receivedMembers *[]string) {
-		controller := NewController("testId", testConfig.ControllerHost, testConfig.ControllerPort, testConfig)
-		controller.Start()
+		controller := NewController("testId", testConfig)
+		go controller.Start()
 		time.Sleep(time.Second * 15)
 		*receivedMembers = controller.List()
 	}(&members)
@@ -106,8 +106,8 @@ func TestHeartBeat(t *testing.T) {
 
 	//bit for the controller
 	go func(receivedMembers *[]string) {
-		controller := NewController("testId", testConfig.ControllerHost, testConfig.ControllerPort, testConfig)
-		controller.Start()
+		controller := NewController("testId", testConfig)
+		go controller.Start()
 		time.Sleep(time.Second * 15)
 		*receivedMembers = controller.List()
 	}(&members)
@@ -148,8 +148,8 @@ func TestHeartBeatMultiNode(t *testing.T) {
 
 	//bit for the controller
 	go func(receivedMembers *[]string) {
-		controller := NewController("testId", testConfig.ControllerHost, testConfig.ControllerPort, testConfig)
-		controller.Start()
+		controller := NewController("testId", testConfig)
+		go controller.Start()
 		time.Sleep(time.Second * 20)
 		*receivedMembers = controller.List()
 	}(&members)
@@ -158,7 +158,7 @@ func TestHeartBeatMultiNode(t *testing.T) {
 
 	go func(id string) {
 		storageNode := storage.NewStorageNode(id, size, "localHost", storagePort0, testConfig)
-		storageNode.Start()
+		go storageNode.Start()
 		time.Sleep(time.Second * 1)
 		storageNode.Shutdown()
 	}(testId)
@@ -191,15 +191,15 @@ func TestSaveFileMetadata(t *testing.T) {
 
 	//bit for the controller
 	go func(file *string) {
-		controller := NewController("testId", testConfig.ControllerHost, testConfig.ControllerPort, testConfig)
-		controller.Start()
+		controller := NewController("testId", testConfig)
+		go controller.Start()
 		controller.fileMetadata.Upload("/foo/something/file.txt")
 		controller.fileMetadata.Upload("/foo/something2/file2.txt")
 		controller.SaveFileMetadata()
 		controller.shutdown()
 		testConfig.ControllerPort = 12042
-		controller = NewController("testId", testConfig.ControllerHost, testConfig.ControllerPort, testConfig)
-		controller.Start()
+		controller = NewController("testId", testConfig)
+		go controller.Start()
 		controller.LoadFileMetadata()
 		*file = controller.fileMetadata.Ls("/foo/something/")
 	}(&file)

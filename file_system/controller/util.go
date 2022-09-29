@@ -1,8 +1,8 @@
 package controller
 
 import (
-	"P1-go-distributed-file-system/connection"
-	"P1-go-distributed-file-system/file_metadata"
+	"dfs/connection"
+	"dfs/file_metadata"
 	"errors"
 	"math/big"
 	"math/rand"

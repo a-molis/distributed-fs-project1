@@ -1,14 +1,14 @@
 package controller
 
 import (
-	. "P1-go-distributed-file-system/config"
-	"P1-go-distributed-file-system/connection"
-	"P1-go-distributed-file-system/file_metadata"
-	"P1-go-distributed-file-system/files_io"
+	"bufio"
+	. "dfs/config"
+	"dfs/connection"
+	"dfs/file_metadata"
+	file_io "dfs/files_io"
+	"io/ioutil"
 	"log"
 	"math/big"
-	"bufio"
-	"io/ioutil"
 	"os"
 )
 
@@ -23,13 +23,13 @@ type Controller struct {
 	config       *Config
 }
 
-func NewController(id string, host string, port int, config *Config) *Controller {
+func NewController(id string, config *Config) *Controller {
 	controller := &Controller{}
 	controller.id = id
-	controller.port = port
+	controller.port = config.ControllerPort
 	controller.memberTable = NewMemberTable()
 	controller.running = true
-	controller.host = host
+	controller.host = config.ControllerHost
 	controller.fileMetadata = file_metadata.NewFileMetaData()
 	controller.config = config
 	return controller
@@ -37,7 +37,7 @@ func NewController(id string, host string, port int, config *Config) *Controller
 
 func (controller *Controller) Start() {
 	controller.server = connection.NewServer(controller.host, controller.port)
-	go controller.listen()
+	controller.listen()
 }
 
 func (controller *Controller) listen() {

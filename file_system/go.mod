@@ -1,4 +1,4 @@
-module P1-go-distributed-file-system
+module dfs
 
 go 1.13
 
