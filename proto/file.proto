@@ -2,7 +2,7 @@ syntax = "proto3";
 option go_package = "./connection";
 
 enum MessageType {
-    LS = 0;
+    DUMMY = 0;
     PUT = 1;
     REGISTRATION = 2;
     GET = 3;
@@ -12,6 +12,7 @@ enum MessageType {
     ACK_LS = 7;
     ERROR = 8;
     ACK_PUT = 9;
+    LS = 10;
 }
 
 message FileData {

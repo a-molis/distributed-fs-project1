@@ -63,6 +63,7 @@ func (memberTable *MemberTable) RecordBeat(id string) {
 	defer memberTable.lock.Unlock()
 	member := memberTable.members[id]
 	member.lastBeat = time.Now()
+	member.status = true
 	memberTable.members[id] = member
 }
 

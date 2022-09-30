@@ -3,6 +3,7 @@ package controller
 import (
 	"dfs/config"
 	"dfs/storage"
+	"os"
 	"testing"
 	"time"
 )
@@ -178,7 +179,7 @@ func TestHeartBeatMultiNode(t *testing.T) {
 }
 
 func TestSaveFileMetadata(t *testing.T) {
-	//defer os.Remove("fmdt")
+	defer os.Remove("fmdt")
 
 	var file string
 

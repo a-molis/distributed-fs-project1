@@ -4,6 +4,8 @@ import (
 	"dfs/config"
 	"dfs/controller"
 	"dfs/storage"
+	"fmt"
+	"os"
 	"testing"
 	"time"
 )
@@ -200,6 +202,13 @@ func TestClientUploadData(t *testing.T) {
 	}(controllerPort, testClientId0)
 
 	time.Sleep(time.Second * 10)
+
+	name := "this_test_path_footxt_"
+	for i := 0; i<10 ; i++ {
+		//newName := name + string(i)
+		newName := fmt.Sprintf("%s%d", name, i)
+		os.Remove(newName)
+	}
 
 	// TODO complete test to validate file is saved
 	if 1 != 1 {

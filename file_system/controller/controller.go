@@ -70,6 +70,9 @@ func (controller *Controller) handleConnection(connectionHandler *connection.Con
 			go controller.uploadHandler(connectionHandler, putChan, message)
 		} else if message.MessageType == connection.MessageType_ACK_PUT {
 			putChan <- message
+		} else if message.MessageType == connection.MessageType_DUMMY {
+			// nothing to see here
+			// TODO fix this nothing
 		}
 	}
 }
