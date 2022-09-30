@@ -1,10 +1,13 @@
 package storage
 
 import (
+	"bufio"
 	"dfs/config"
 	"dfs/connection"
 	"log"
 	"math/big"
+	"os"
+	"strings"
 	"time"
 )
 
@@ -16,6 +19,7 @@ type StorageNode struct {
 	config *config.Config
 	connectionHandler *connection.ConnectionHandler
 	running           bool
+	server 			*connection.Server
 
 }
 
@@ -82,4 +86,75 @@ func (storageNode *StorageNode) heartbeat() {
 		storageNode.connectionHandler.Send(message)
 		time.Sleep(heartBeatRate)
 	}
+}
+
+func (storageNode *StorageNode) listen() {
+	for storageNode.running {
+		connectionHandler, err := storageNode.server.NextConnectionHandler()
+		if err != nil {
+			log.Println("Cannot get the connection handler ", err)
+		}
+		go storageNode.handleConnection(connectionHandler)
+	}
+}
+
+func (storageNode *StorageNode) handleConnection(connectionHandler *connection.ConnectionHandler) {
+	for storageNode.running {
+		message, err := connectionHandler.Receive()
+		if err != nil {
+			log.Println("Cannot receive message ", err)
+		}
+		if message.MessageType == connection.MessageType_PUT {
+			storageNode.uploadHandler(connectionHandler, message)
+		}
+	}
+}
+
+func (storageNode *StorageNode) uploadHandler(connectionHandler *connection.ConnectionHandler, message *connection.FileData) {
+	size := message.DataSize
+	path := message.Path
+	//nodes := message.Nodes
+
+	//prepare ack
+	response := &connection.FileData{}
+	response.MessageType = connection.MessageType_ACK_PUT
+	connectionHandler.Send(response)
+
+	//read from stream
+	data := make([]byte, size)
+	connectionHandler.ReadN(data)
+
+	//save file
+	filename := strings.ReplaceAll(path, "/", "-")
+	file, err := os.Create(filename)
+	defer file.Close()
+	if err != nil {
+		log.Println("Error opening file ", path)
+		return
+	}
+	writer := bufio.NewWriter(file)
+	_, err = writer.Write(data)
+	if err != nil {
+		log.Println("Error writing to file ", path,  err)
+		return
+	}
+	err = writer.Flush()
+	if err != nil {
+		log.Println("Error flushing writer to file ", path)
+		return
+	}
+
+	//send back ack
+	response = &connection.FileData{}
+	response.MessageType = connection.MessageType_ACK_PUT
+	connectionHandler.Send(response)
+
+	// TODO send some heartbeat with info
+
+	//begin replication
+
+}
+
+func (storageNode *StorageNode) replicationHandler(connectionHandler *connection.ConnectionHandler, message *connection.FileData) {
+	//chunkMetaMap[chunkName].Nodes = chunkMetaMap[chunkName].Nodes[1:] //peel of the used node
 }

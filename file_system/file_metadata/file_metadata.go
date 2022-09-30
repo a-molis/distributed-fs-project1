@@ -149,7 +149,7 @@ func newNode(path string) *Node {
 // TODO chunks to use set data type
 type File struct {
 	Name          string
-	Chunks        []*Chunk
+	Chunks        []*Chunk //TODO Map
 	Status        Status
 	Checksum      int32
 	PendingChunks int
@@ -160,7 +160,7 @@ type Chunk struct {
 	Size         int64
 	Checksum     int32
 	Status       Status
-	StorageNodes []string
+	StorageNodes []string //TODO this needs to be map for better pending state
 }
 
 type Status int32

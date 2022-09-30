@@ -19,7 +19,7 @@ func NewConnectionHandler(conn net.Conn) *ConnectionHandler {
 	return m
 }
 
-func (m *ConnectionHandler) readN(buf []byte) error {
+func (m *ConnectionHandler) ReadN(buf []byte) error {
 	bytesRead := uint64(0)
 	for bytesRead < uint64(len(buf)) {
 		n, err := m.conn.Read(buf[bytesRead:])
@@ -31,7 +31,7 @@ func (m *ConnectionHandler) readN(buf []byte) error {
 	return nil
 }
 
-func (m *ConnectionHandler) writeN(buf []byte) error {
+func (m *ConnectionHandler) WriteN(buf []byte) error {
 	bytesWritten := uint64(0)
 	for bytesWritten < uint64(len(buf)) {
 		n, err := m.conn.Write(buf[bytesWritten:])
@@ -51,19 +51,19 @@ func (m *ConnectionHandler) Send(fileData *FileData) error {
 
 	prefix := make([]byte, 8)
 	binary.LittleEndian.PutUint64(prefix, uint64(len(serialized)))
-	m.writeN(prefix)
-	m.writeN(serialized)
+	m.WriteN(prefix)
+	m.WriteN(serialized)
 
 	return nil
 }
 
 func (m *ConnectionHandler) Receive() (*FileData, error) {
 	prefix := make([]byte, 8)
-	m.readN(prefix)
+	m.ReadN(prefix)
 
 	payloadSize := binary.LittleEndian.Uint64(prefix)
 	payload := make([]byte, payloadSize)
-	m.readN(payload)
+	m.ReadN(payload)
 
 	fileData := &FileData{}
 	err := proto.Unmarshal(payload, fileData)

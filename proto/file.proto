@@ -23,6 +23,8 @@ message FileData {
     string senderId = 6;
     repeated Chunk chunk = 7;
     Node node = 8;
+    int64 dataSize = 9;
+    repeated Node nodes = 10;
 }
 
 message Node {
