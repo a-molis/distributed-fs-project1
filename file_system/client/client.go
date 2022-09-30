@@ -25,7 +25,6 @@ type chunkMeta struct {
 	name string
 	size int64
 	Nodes []*connection.Node
-	data []byte
 }
 
 type Node struct {
@@ -139,7 +138,7 @@ func (client *Client) put(result *connection.FileData, connectionHandler *connec
 	// map with storage node and connection handler
 	// generate the chunks-data as byte arrays
 	// send the chunk data to corresponding node
-	//client.sendChunksToNodes(chunkMetaMap)
+	client.sendChunksToNodes(chunkMetaMap)
 }
 
 func (client *Client) getChunkMeta() (map[string]*chunkMeta, error) {
@@ -147,6 +146,7 @@ func (client *Client) getChunkMeta() (map[string]*chunkMeta, error) {
 	numChunks := int(fileSize / client.config.ChunkSize)
 	chunkMap := make(map[string]*chunkMeta)
 	filePrefix := strings.Replace(strings.TrimPrefix(client.remotePath, "/"), "/", "_", -1)
+	filePrefix = strings.ReplaceAll(filePrefix, ".", "")
 	for i := 0; i < numChunks; i++ {
 		chunkName := fmt.Sprintf("%s_%d", filePrefix, i)
 		chunkMeta := &chunkMeta{}
@@ -196,37 +196,28 @@ func (client *Client) sendChunkInfoController(handler *connection.ConnectionHand
 
 type BlockingConnection struct {
 	conHandler *connection.ConnectionHandler
-	mu *sync.Mutex
+	mu sync.Mutex
 }
 
 func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) {
 
-	// get chunk byte array
-	err := client.getChunkData(chunkMetaMap)
+	blockingHandlerMap := make(map[string]*BlockingConnection)
+
+	file, err := os.Open(client.localPath)
 	if err != nil {
-		log.Println("error getting chunk data")
+		log.Println("Cannot open target file")
 		return
 	}
-
-	blockingHandlerMap := make(map[string]*BlockingConnection)
-	//handlerMap := make(map[string]*connection.ConnectionHandler)
-	// add handler mutex map
-	// you need to aqcuire the lock before using the connecction handleer so that we dont accidentally send two chunks at the same time to same node
-	//handlerMutexMap := make(map[string]*sync.Mutex)
-
-	// file := os.Open(filename)
 	for chunkName := range chunkMetaMap {
 		//TODO do this bit as a go routine
-		// bytes = readNbytes()
-		//
 
-		// get connection handler corresponding to storage node //this is gona block if con hand in use
-		// node := chunkMetaMap[chunkName].Nodes[0]
+		chunkData, err:= getChunkData(chunkMetaMap, chunkName, file)
+		if err != nil {
+			fmt.Println("Error getting chunk data for chunk ", chunkName)
+		}
 
-		//mu := handlerMutexMap[node.Id] //this bit is to ensure that if multiple chunks are sent to the same node, it is in order
-		//mu.Lock()
-
-		blockingHandler := getConnectionHandler(chunkMetaMap, chunkName, blockingHandlerMap)
+		node := chunkMetaMap[chunkName].Nodes[0]
+		blockingHandler := getConnectionHandler(node, blockingHandlerMap)
 
 		blockingHandler.mu.Lock()
 		conHandler := blockingHandler.conHandler
@@ -240,7 +231,7 @@ func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) {
 		message.Nodes = chunkMetaMap[chunkName].Nodes
 		//message.checksum TODO
 
-		err := conHandler.Send(message)
+		err = conHandler.Send(message)
 		if err != nil {
 			fmt.Println("Error sending chunk metadata to storage node")
 		}
@@ -250,7 +241,7 @@ func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) {
 			log.Fatalln("Error receiving ack data for put metadata from storage node on the client")
 		}
 		// send chunk
-		err = conHandler.WriteN(chunkMetaMap[chunkName].data)
+		err = conHandler.WriteN(chunkData)
 		if err != nil {
 			fmt.Println("Error sending chunk payload to storage node")
 		}
@@ -259,13 +250,26 @@ func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) {
 		if err != nil || result.MessageType != connection.MessageType_ACK_PUT {
 			log.Fatalln("Error receiving ack data for put payload from storage node on the client")
 		}
+
+		log.Println("sent chunk info to storage node ", chunkName)
 		blockingHandler.mu.Unlock()
 	}
 }
 
-func getConnectionHandler(chunkMetaMap map[string]*chunkMeta, chunkName string, handlerMap map[string]*BlockingConnection) *BlockingConnection {
-	node := chunkMetaMap[chunkName].Nodes[0]
+func getChunkData(chunkMetaMap map[string]*chunkMeta, chunkName string, file *os.File) ([]byte, error) {
+	chunkData := make([]byte, chunkMetaMap[chunkName].size)
+	numBytes, err := file.Read(chunkData)
+	if err != nil {
+		log.Println("Error reading bytes from target file", err)
+		return nil, err
+	}
+	if int64(numBytes) != chunkMetaMap[chunkName].size {
+		log.Println("Did not read same bytes as chunk size", chunkName)
+	}
+	return chunkData, err
+}
 
+func getConnectionHandler(node *connection.Node, handlerMap map[string]*BlockingConnection) *BlockingConnection {
 	blockingConnection, ok := handlerMap[node.Id]
 	if !ok {
 		blockingConnection = &BlockingConnection{}
@@ -279,28 +283,6 @@ func getConnectionHandler(chunkMetaMap map[string]*chunkMeta, chunkName string, 
 	}
 
 	return blockingConnection
-}
-
-func (client *Client) getChunkData(chunkMetaMap map[string]*chunkMeta) error {
-	file, err := os.Open(client.localPath)
-	if err != nil {
-		log.Println("Cannot open target file")
-		return err
-	}
-
-	for chunkName := range chunkMetaMap {
-		chunkData := make([]byte, chunkMetaMap[chunkName].size)
-		numBytes, err := file.Read(chunkData)
-		if err != nil {
-			log.Println("Error reading bytes from target file", err)
-			return err
-		}
-		if int64(numBytes) != chunkMetaMap[chunkName].size {
-			log.Println("Did not read same bytes as chunk size", chunkName)
-		}
-		chunkMetaMap[chunkName].data = chunkData
-	}
-	return nil
 }
 
 func clientChunkToProto(chunkMeta *chunkMeta) *connection.Chunk {

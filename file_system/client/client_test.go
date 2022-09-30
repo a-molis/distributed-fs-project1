@@ -151,3 +151,59 @@ func TestClientUpload(t *testing.T) {
 
 	return
 }
+
+func TestClientUploadData(t *testing.T) {
+	controllerHost := "localhost"
+	storageHost := "localhost"
+	controllerPort := 12050
+	var storagePort0 int32 = 12051
+
+	var size int64 = 1000000
+	var chunkSize int64 = 5000000
+
+	testConfig, err := config.ConfigFromPath("../config.json")
+	if err != nil {
+		t.Errorf("Unable to open config")
+		return
+	}
+	testConfig.ChunkSize = chunkSize
+	testConfig.ControllerHost = controllerHost
+	testConfig.ControllerPort = controllerPort
+
+	uploadPath := "/this/test/path/foo.txt"
+	localPath := "testdata/testFile.txt"
+
+	testStorageNode0 := "testStorageNode0"
+	testClientId0 := "clientId0"
+
+	var members []string
+
+	go func(receivedMembers *[]string) {
+		testController := controller.NewController("testId", testConfig)
+		testController.Start()
+		time.Sleep(time.Second * 1)
+		*receivedMembers = testController.List()
+	}(&members)
+
+	time.Sleep(time.Second * 1)
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode0, size, storageHost, storagePort0, testConfig)
+		storageNode.Start()
+		time.Sleep(time.Second * 1)
+	}()
+
+	time.Sleep(time.Second * 3)
+	go func(port int, id string) {
+		testClient := NewClient(testConfig, "put", uploadPath, localPath)
+		testClient.Start()
+	}(controllerPort, testClientId0)
+
+	time.Sleep(time.Second * 10)
+
+	// TODO complete test to validate file is saved
+	if 1 != 1 {
+		t.Fatalf("the registered node id doesnt match %s", members[0])
+	}
+	
+}

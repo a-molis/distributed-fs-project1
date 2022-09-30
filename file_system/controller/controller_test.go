@@ -67,7 +67,7 @@ func TestHeartBeatInactive(t *testing.T) {
 	go func(receivedMembers *[]string) {
 		controller := NewController("testId", testConfig)
 		go controller.Start()
-		time.Sleep(time.Second * 15)
+		time.Sleep(time.Second * 20)
 		*receivedMembers = controller.List()
 	}(&members)
 
@@ -79,7 +79,7 @@ func TestHeartBeatInactive(t *testing.T) {
 		storageNode.Shutdown()
 	}(testId)
 
-	time.Sleep(time.Second * 20)
+	time.Sleep(time.Second * 25)
 
 	if len(members) != 0 {
 		t.Fatalf("the registered node did not switch to inactive")
@@ -178,6 +178,7 @@ func TestHeartBeatMultiNode(t *testing.T) {
 }
 
 func TestSaveFileMetadata(t *testing.T) {
+	//defer os.Remove("fmdt")
 
 	var file string
 
@@ -187,7 +188,7 @@ func TestSaveFileMetadata(t *testing.T) {
 		return
 	}
 	testConfig.ControllerHost = "localhost"
-	testConfig.ControllerPort = 12041
+	testConfig.ControllerPort = 12060
 
 	//bit for the controller
 	go func(file *string) {
@@ -197,7 +198,7 @@ func TestSaveFileMetadata(t *testing.T) {
 		controller.fileMetadata.Upload("/foo/something2/file2.txt")
 		controller.SaveFileMetadata()
 		controller.shutdown()
-		testConfig.ControllerPort = 12042
+		testConfig.ControllerPort = 12061
 		controller = NewController("testId", testConfig)
 		go controller.Start()
 		controller.LoadFileMetadata()

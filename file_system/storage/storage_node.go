@@ -7,7 +7,6 @@ import (
 	"log"
 	"math/big"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -50,6 +49,8 @@ func (storageNode *StorageNode) Start() {
 
 	storageNode.running = true
 	go storageNode.heartbeat()
+	storageNode.server = connection.NewServer(storageNode.storageNodeHost, int(storageNode.storageNodePort))
+	go storageNode.listen()
 }
 
 func (storageNode *StorageNode) Shutdown() {
@@ -125,8 +126,7 @@ func (storageNode *StorageNode) uploadHandler(connectionHandler *connection.Conn
 	connectionHandler.ReadN(data)
 
 	//save file
-	filename := strings.ReplaceAll(path, "/", "-")
-	file, err := os.Create(filename)
+	file, err := os.Create("./" + path)
 	defer file.Close()
 	if err != nil {
 		log.Println("Error opening file ", path)
