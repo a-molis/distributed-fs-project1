@@ -39,4 +39,5 @@ message Chunk {
     int64 size = 2;
     int32 checksum = 3;
     repeated Node nodes = 4;
+    int32 num = 5;
 }

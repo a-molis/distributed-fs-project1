@@ -6,6 +6,7 @@ import (
 	"dfs/connection"
 	"dfs/file_metadata"
 	file_io "dfs/files_io"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"math/big"
@@ -70,6 +71,8 @@ func (controller *Controller) handleConnection(connectionHandler *connection.Con
 			go controller.uploadHandler(connectionHandler, putChan, message)
 		} else if message.MessageType == connection.MessageType_ACK_PUT {
 			putChan <- message
+		} else if message.MessageType == connection.MessageType_GET {
+			go controller.getHandler(connectionHandler, message)
 		} else if message.MessageType == connection.MessageType_DUMMY {
 			// nothing to see here
 			// TODO fix this nothing
@@ -209,4 +212,23 @@ func (controller *Controller) LoadFileMetadata() error {
 		controller.fileMetadata.LoadBytes(bytes)
 	}
 	return err
+}
+
+func (controller *Controller) getHandler(handler *connection.ConnectionHandler, message *connection.FileData) {
+	sendMessage := &connection.FileData{}
+
+	// TODO add check if in pending state
+	chunks, err := controller.fileMetadata.Download(message.Path)
+	if err != nil {
+		sendMessage.Data = fmt.Sprintf("%s", err)
+		sendMessage.MessageType = connection.MessageType_ERROR
+		err := handler.Send(sendMessage)
+		if err != nil {
+			log.Println("Error sending error for get operation")
+		}
+		return
+	}
+	sendMessage.Chunk = chunkToProto(chunks, controller.memberTable)
+	sendMessage.MessageType = connection.MessageType_GET
+	err = handler.Send(sendMessage)
 }

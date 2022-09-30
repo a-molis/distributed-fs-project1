@@ -84,13 +84,16 @@ func (fileMetadata *FileMetadata) Ls(path string) string {
 	return strings.TrimSuffix(res, " ")
 }
 
-func (fileMetadata *FileMetadata) download(path string) []*Chunk {
+func (fileMetadata *FileMetadata) Download(path string) ([]*Chunk, error) {
 	pathSplit := strings.Split(path, "/")
 	fileName := pathSplit[len(pathSplit)-1]
 	directoryPath := strings.Replace(path, fileName, "", -1)
 	directoryNode := getNode(fileMetadata.rootNode, directoryPath, false)
+	if directoryNode == nil {
+		return nil, errors.New("File does not exist")
+	}
 	file := directoryNode.Files[fileName]
-	return file.Chunks
+	return file.Chunks, nil
 }
 
 func (fileMetadata *FileMetadata) PathExists(path string) bool {
@@ -161,6 +164,7 @@ type Chunk struct {
 	Checksum     int32
 	Status       Status
 	StorageNodes []string //TODO this needs to be map for better pending state
+	Num 		 int32
 }
 
 type Status int32

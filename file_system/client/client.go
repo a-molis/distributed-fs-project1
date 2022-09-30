@@ -1,11 +1,13 @@
 package client
 
 import (
+	. "dfs/atomic_data"
 	. "dfs/config"
 	"dfs/connection"
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -25,6 +27,8 @@ type chunkMeta struct {
 	name string
 	size int64
 	Nodes []*connection.Node
+	data []byte
+	num int32
 }
 
 type Node struct {
@@ -106,8 +110,10 @@ func (client *Client) sendToController(err error, message *connection.FileData, 
 	} else if result.MessageType == connection.MessageType_PUT {
 		log.Println("Client received put message")
 		client.put(result, connectionHandler)
+	} else if result.MessageType == connection.MessageType_GET {
+		client.get(result, connectionHandler)
 	} else if result.MessageType == connection.MessageType_ERROR {
-		log.Fatalln("Error from controller: ", result.Data)
+		log.Fatalln("Error: ", result.Data)
 	} else {
 		log.Fatalln("Error client unable to get result from controller")
 	}
@@ -152,6 +158,7 @@ func (client *Client) getChunkMeta() (map[string]*chunkMeta, error) {
 		chunkMeta := &chunkMeta{}
 		chunkMeta.size = client.config.ChunkSize
 		chunkMeta.name = chunkName
+		chunkMeta.num = int32(i)
 		chunkMap[chunkName] = chunkMeta
 	}
 	remainingSize := fileSize % client.config.ChunkSize
@@ -160,6 +167,7 @@ func (client *Client) getChunkMeta() (map[string]*chunkMeta, error) {
 		chunkMeta := &chunkMeta{}
 		chunkMeta.size = remainingSize
 		chunkMeta.name = lastChunkName
+		chunkMeta.num = int32(numChunks)
 		chunkMap[lastChunkName] = chunkMeta
 	}
 	return chunkMap, nil
@@ -285,10 +293,68 @@ func getConnectionHandler(node *connection.Node, handlerMap map[string]*Blocking
 	return blockingConnection
 }
 
+func (client *Client) getChunkData(chunkMetaMap map[string]*chunkMeta) error {
+	file, err := os.Open(client.localPath)
+	if err != nil {
+		log.Println("Cannot open target file")
+		return err
+	}
+
+	for chunkName := range chunkMetaMap {
+		chunkData := make([]byte, chunkMetaMap[chunkName].size)
+		numBytes, err := file.Read(chunkData)
+		if err != nil {
+			log.Println("Error reading bytes from target file", err)
+			return err
+		}
+		if int64(numBytes) != chunkMetaMap[chunkName].size {
+			log.Println("Did not read same bytes as chunk size", chunkName)
+		}
+		chunkMetaMap[chunkName].data = chunkData
+	}
+	return nil
+}
+
+func (client *Client) get(result *connection.FileData, handler *connection.ConnectionHandler) {
+	chunks := result.Chunk
+	sort.SliceStable(chunks, func(i, j int) bool {
+		return chunks[i].Num < chunks[j].Num
+	})
+	blockingHandlerMap := make(map[string]*BlockingConnection)
+
+	// Using a channel as a blocking queue with size 10
+	var downloadChan = make(chan []byte, 10)
+	numChunks := int32(len(chunks))
+	nextChunkNum := NewAtomicInt(&chunks[0].Num)
+	go client.saveData(numChunks, downloadChan)
+	for _, chunk := range chunks {
+		go getChunkFromStorage(chunk, blockingHandlerMap, nextChunkNum)
+	}
+}
+
+func getChunkFromStorage(chunk *connection.Chunk, handlerMap map[string]*BlockingConnection, num *AtomicInt) {
+
+}
+
+func (client *Client) saveData(numChunks int32, downloadChan chan []byte) {
+	file, err := os.OpenFile(client.localPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatalln("Failed to open file on client for saving data ", err)
+	}
+	for i := numChunks; i > 0; i-- {
+		data := <- downloadChan
+		write, err := file.Write(data)
+		if err != nil || write != len(data) {
+			log.Fatalln("Error writing to save file ", err)
+		}
+	}
+}
+
 func clientChunkToProto(chunkMeta *chunkMeta) *connection.Chunk {
 	protoChunk := &connection.Chunk{}
 	protoChunk.Name = chunkMeta.name
 	protoChunk.Size = chunkMeta.size
+	protoChunk.Num = chunkMeta.num
 	return protoChunk
 }
 

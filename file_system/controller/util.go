@@ -16,6 +16,7 @@ func ProtoToChunk(chunks []*connection.Chunk) []*file_metadata.Chunk {
 		newChunk.Checksum = c.Checksum
 		newChunk.Status = file_metadata.Pending
 		newChunk.Size = c.Size
+		newChunk.Num = c.Num
 		res = append(res, newChunk)
 	}
 	return res
@@ -29,6 +30,7 @@ func chunkToProto(chunks []*file_metadata.Chunk, memberTable *MemberTable) []*co
 		newChunk.Checksum = c.Checksum
 		newChunk.Size = c.Size
 		newChunk.Nodes = generateNodes(c.StorageNodes, memberTable)
+		newChunk.Num = c.Num
 		res = append(res, newChunk)
 	}
 	return res
