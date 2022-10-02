@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"dfs/config"
 	"dfs/connection"
+	file_io "dfs/files_io"
 	"log"
 	"math/big"
 	"os"
@@ -100,6 +101,7 @@ func (storageNode *StorageNode) listen() {
 }
 
 func (storageNode *StorageNode) handleConnection(connectionHandler *connection.ConnectionHandler) {
+	getChan := make(chan *connection.FileData)
 	for storageNode.running {
 		message, err := connectionHandler.Receive()
 		if err != nil {
@@ -107,6 +109,10 @@ func (storageNode *StorageNode) handleConnection(connectionHandler *connection.C
 		}
 		if message.MessageType == connection.MessageType_PUT {
 			storageNode.uploadHandler(connectionHandler, message)
+		} else if message.MessageType == connection.MessageType_GET {
+			go storageNode.downloadHandler(connectionHandler, message, getChan)
+		} else if message.MessageType == connection.MessageType_ACK_GET {
+			getChan <- message
 		}
 	}
 }
@@ -157,4 +163,38 @@ func (storageNode *StorageNode) uploadHandler(connectionHandler *connection.Conn
 
 func (storageNode *StorageNode) replicationHandler(connectionHandler *connection.ConnectionHandler, message *connection.FileData) {
 	//chunkMetaMap[chunkName].Nodes = chunkMetaMap[chunkName].Nodes[1:] //peel of the used node
+}
+
+func (storageNode *StorageNode) downloadHandler(handler *connection.ConnectionHandler,
+	message *connection.FileData, getChan <-chan *connection.FileData) {
+	sendMessage := &connection.FileData{}
+	log.Printf("Storage node %s received request to download %s", storageNode.id, message.Path)
+	data, err := file_io.ReadFile(message.Path)
+	if err != nil {
+		sendMessage.MessageType = connection.MessageType_ERROR
+		err := handler.Send(sendMessage)
+		if err != nil {
+			log.Printf("Error sending erorr message for download chunk on storage node %s", storageNode.id)
+		}
+	}
+	// TODO change to message type of send data
+	sendMessage.MessageType = connection.MessageType_GET
+	sendMessage.DataSize = int64(len(data))
+	err = handler.Send(sendMessage)
+	if err != nil {
+		log.Printf("Error sending initial data size to client on storage node %s", storageNode.id)
+	}
+	ack := <- getChan
+	if ack.MessageType != connection.MessageType_ACK_GET {
+		log.Printf("Error ack for sending initial data size to client on storage node %s", storageNode.id)
+	}
+	log.Println("Storage node received ack")
+	err = handler.WriteN(data)
+	if err != nil {
+		log.Printf("Error writeN sending data to client download on storage node %s", storageNode.id)
+	}
+	lastAck := <- getChan
+	if lastAck.MessageType != connection.MessageType_ACK_GET {
+		log.Printf("Error ack for downlaod data client on storage node %s", storageNode.id)
+	}
 }

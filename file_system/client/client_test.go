@@ -5,6 +5,7 @@ import (
 	"dfs/controller"
 	"dfs/storage"
 	"fmt"
+	"log"
 	"os"
 	"testing"
 	"time"
@@ -217,9 +218,24 @@ func TestClientUploadData(t *testing.T) {
 
 }
 
-
-
 func TestClientDownloadSimple(t *testing.T) {
+	savePath := "testdata/downloadCopySimple.txt"
+	defer func(savePath string) {
+		err := os.Remove(savePath)
+		if err != nil {
+			log.Printf("Unable to delete file at %s", savePath)
+		}
+	}(savePath)
+	name := "this_test_path_footxt_"
+	defer func(name string) {
+		for i := 0; i<10 ; i++ {
+			newName := fmt.Sprintf("%s%d", name, i)
+			err := os.Remove(newName)
+			if err != nil {
+				log.Printf("Unable to delete files at %s", name)
+			}
+		}
+	}(name)
 	controllerHost := "localhost"
 	storageHost := "localhost"
 	controllerPort := 12043
@@ -242,7 +258,7 @@ func TestClientDownloadSimple(t *testing.T) {
 
 	remotePath := "/this/test/path/foo.txt"
 	localPath := "testdata/testFile.txt"
-	savePath := "testdata/downloadCopySimple.txt"
+
 
 	testStorageNode0 := "testStorageNode0"
 	testStorageNode1 := "testStorageNode1"

@@ -323,20 +323,83 @@ func (client *Client) get(result *connection.FileData, handler *connection.Conne
 	blockingHandlerMap := make(map[string]*BlockingConnection)
 
 	// Using a channel as a blocking queue with size 10
-	var downloadChan = make(chan []byte, 10)
+	// bytes only written into queue when in order
+	var downloadChan = make(chan []byte, 5)
 	numChunks := int32(len(chunks))
 	nextChunkNum := NewAtomicInt(&chunks[0].Num)
-	go client.saveData(numChunks, downloadChan)
+	saveLock := NewWaitNotify()
+	go client.saveData(numChunks, downloadChan, saveLock)
+
 	for _, chunk := range chunks {
-		go getChunkFromStorage(chunk, blockingHandlerMap, nextChunkNum)
+		go getChunkFromStorage(chunk, blockingHandlerMap, nextChunkNum, saveLock, downloadChan)
 	}
 }
 
-func getChunkFromStorage(chunk *connection.Chunk, handlerMap map[string]*BlockingConnection, num *AtomicInt) {
+func getChunkFromStorage(chunk *connection.Chunk, handlerMap map[string]*BlockingConnection,
+	nextChunkNum *AtomicInt, saveLock *WaitNotify, downloadChan chan []byte) {
+	blockingHandler := getConnectionHandler(chunk.Nodes[0], handlerMap)
+	blockingHandler.mu.Lock()
+	conn := blockingHandler.conHandler
 
+	data, err := getBytesFromStorage(conn, chunk)
+	if err != nil {
+		// TODO continue in loop to get chunk from other node if not found on first node
+		log.Fatalln("Error getting data from storage node")
+	}
+	saveLock.Cond.L.Lock()
+	sent := false
+	for !sent {
+		if nextChunkNum.Get() == chunk.Num {
+			log.Printf("Writing data for chunk num %d\n", chunk.Num)
+			downloadChan <- data
+			nextChunkNum.Increment()
+			saveLock.Cond.L.Unlock()
+			break
+		}
+		saveLock.Cond.Wait()
+	}
+
+	blockingHandler.mu.Unlock()
 }
 
-func (client *Client) saveData(numChunks int32, downloadChan chan []byte) {
+func getBytesFromStorage(conn *connection.ConnectionHandler, chunk *connection.Chunk) ([]byte, error) {
+	message := &connection.FileData{}
+	message.Path = chunk.Name
+	message.MessageType = connection.MessageType_GET
+	err := conn.Send(message)
+	if err != nil {
+		log.Printf("Error getting data from storage node for chunk %s\n", chunk.Name)
+		return nil, err
+	}
+	dataSize, err := conn.Receive()
+	if err != nil || dataSize.MessageType == connection.MessageType_ERROR {
+		log.Println("Error client getting size from storage node")
+		return nil, err
+	}
+	ack := &connection.FileData{}
+	ack.MessageType = connection.MessageType_ACK_GET
+	err = conn.Send(ack)
+	if err != nil {
+		log.Printf("Error sending ack to storage node for size for chunk %sn", chunk.Name)
+		return nil, err
+	}
+	byteData := make([]byte, dataSize.DataSize)
+	err = conn.ReadN(byteData)
+	if err != nil {
+		log.Printf("Error reading byte data for chunk %s\n", chunk.Name)
+		return nil, err
+	}
+	err = conn.Send(ack)
+	if err != nil {
+		log.Printf("Error sending ack to storage node for receiving raw bytes %s\n", chunk.Name)
+		return nil, err
+	}
+	return byteData, nil
+}
+
+
+
+func (client *Client) saveData(numChunks int32, downloadChan chan []byte, saveLock *WaitNotify) {
 	file, err := os.OpenFile(client.localPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Fatalln("Failed to open file on client for saving data ", err)
@@ -347,6 +410,8 @@ func (client *Client) saveData(numChunks int32, downloadChan chan []byte) {
 		if err != nil || write != len(data) {
 			log.Fatalln("Error writing to save file ", err)
 		}
+		log.Printf("recevied data of size %d\n", len(data))
+		saveLock.Cond.Broadcast()
 	}
 }
 
