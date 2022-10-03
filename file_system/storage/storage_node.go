@@ -1,10 +1,12 @@
 package storage
 
 import (
-	"bufio"
+	"bytes"
+	"crypto/md5"
 	"dfs/config"
 	"dfs/connection"
 	file_io "dfs/files_io"
+	"fmt"
 	"log"
 	"math/big"
 	"os"
@@ -20,15 +22,17 @@ type StorageNode struct {
 	connectionHandler *connection.ConnectionHandler
 	running           bool
 	server 			*connection.Server
+	savePath string
 
 }
 
-func NewStorageNode(id string, size int64, host string, port int32, config *config.Config) *StorageNode {
+func NewStorageNode(id string, size int64, host string, port int32, config *config.Config, savePath string) *StorageNode {
 	storageNode := &StorageNode{}
 	storageNode.id = id
 	storageNode.storageNodeHost = host
 	storageNode.storageNodePort = port
 	storageNode.config = config
+	storageNode.savePath = savePath
 
 	// input size in MB convert to bytes and stored in Math/big.Int
 	storageNode.size.SetInt64(size)
@@ -121,6 +125,7 @@ func (storageNode *StorageNode) uploadHandler(connectionHandler *connection.Conn
 	size := message.DataSize
 	path := message.Path
 	//nodes := message.Nodes
+	//extract file path to be used for heartbeat
 
 	//prepare ack
 	response := &connection.FileData{}
@@ -131,24 +136,26 @@ func (storageNode *StorageNode) uploadHandler(connectionHandler *connection.Conn
 	data := make([]byte, size)
 	connectionHandler.ReadN(data)
 
+	//compare checksums
+	sum := md5.Sum(data)
+	if !bytes.Equal(sum[:], message.Checksum) {
+		log.Printf("the received chunk data is corrupted for chunk %s \n", path)
+		//TODO handle the sad path here
+	}
+	log.Println("storage node read the data and compared checksums")
+
 	//save file
-	file, err := os.Create("./" + path)
+	dirname := storageNode.savePath
+	err := os.Mkdir( dirname, 0700)
+	file, err := os.Create("./" + dirname+ "/" + path)
 	defer file.Close()
 	if err != nil {
-		log.Println("Error opening file ", path)
+		log.Println("Error opening file ", path, err)
 		return
 	}
-	writer := bufio.NewWriter(file)
-	_, err = writer.Write(data)
-	if err != nil {
-		log.Println("Error writing to file ", path,  err)
-		return
-	}
-	err = writer.Flush()
-	if err != nil {
-		log.Println("Error flushing writer to file ", path)
-		return
-	}
+	file.Write(data)
+
+	log.Printf("chunk %s saved \n", path)
 
 	//send back ack
 	response = &connection.FileData{}
@@ -158,11 +165,67 @@ func (storageNode *StorageNode) uploadHandler(connectionHandler *connection.Conn
 	// TODO send some heartbeat with info
 
 	//begin replication
-
+	if len(message.Nodes) > 1 {
+		storageNode.replicationHandler(data, message)
+	}
 }
 
-func (storageNode *StorageNode) replicationHandler(connectionHandler *connection.ConnectionHandler, message *connection.FileData) {
-	//chunkMetaMap[chunkName].Nodes = chunkMetaMap[chunkName].Nodes[1:] //peel of the used node
+func (storageNode *StorageNode) replicationHandler(chunkData []byte, message *connection.FileData) {
+	//peel off current node from the message
+	nodes := peelOffNode(message.Nodes, storageNode.id)
+
+	//prepare message
+	replicationMessage := &connection.FileData{}
+	replicationMessage.Path = message.Path
+	replicationMessage.MessageType = connection.MessageType_PUT
+	replicationMessage.Nodes = nodes
+	replicationMessage.DataSize = message.DataSize
+	replicationMessage.Data = message.Data
+	replicationMessage.Checksum = message.Checksum
+
+	//pick destination node
+	node := nodes[0]
+
+	//dial the destination node
+	conHandler, err := connection.NewClient(node.Hostname, int(node.Port))
+	if err != nil {
+		log.Println("error dialing the next node for replication")
+	}
+
+	//send metadata
+	err = conHandler.Send(replicationMessage)
+	if err != nil {
+		fmt.Println("Error sending replication message to storage node")
+	}
+
+	// wait for ack
+	result, err := conHandler.Receive()
+	if err != nil || result.MessageType != connection.MessageType_ACK_PUT {
+		log.Fatalf("Error receiving ack data for replication message from storage node %s to storage node %s \n", node.Id, storageNode.id)
+	}
+
+	// send chunk
+	err = conHandler.WriteN(chunkData)
+	if err != nil {
+		fmt.Println("Error sending chunk payload for replication to storage node")
+	}
+	//wait for ack
+	result, err = conHandler.Receive()
+	if err != nil || result.MessageType != connection.MessageType_ACK_PUT {
+		log.Fatalf("Error receiving ack data for replication message from storage node %s to storage node %s \n", node.Id, storageNode.id)
+	}
+
+	log.Println("successfully sent replication message and data ")
+}
+
+func peelOffNode(nodes []*connection.Node, id string) []*connection.Node{
+	for i, n := range nodes {
+		if n.Id == id {
+			nodes = append(nodes[:i], nodes[i+1:]...)
+			break
+		}
+	}
+	return nodes
 }
 
 func (storageNode *StorageNode) downloadHandler(handler *connection.ConnectionHandler,

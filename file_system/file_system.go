@@ -34,18 +34,18 @@ func main() {
 	case "client":
 		runClient(configFile, command, localPath, remotePath)
 	case "storage":
-		runStorage(id, storageSize, host, port, configFile)
+		runStorage(id, storageSize, host, port, configFile, localPath)
 	default:
 		log.Fatalln("Unsupported node type")
 	}
 	log.Println("Shutting down ", *nodeType)
 }
 
-func runStorage(id *string, size *int64, host *string, port *int, config *config.Config) {
+func runStorage(id *string, size *int64, host *string, port *int, config *config.Config, localPath *string) {
 	if len(*id) < 1 || *size < 0 || len(*host) < 1 || *port < 0 {
 		log.Fatalln("Invalid args for storage node")
 	}
-	newStorageNode := storage.NewStorageNode(*id, *size, *host, int32(*port), config)
+	newStorageNode := storage.NewStorageNode(*id, *size, *host, int32(*port), config, *localPath)
 	newStorageNode.Start()
 }
 

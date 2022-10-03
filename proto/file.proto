@@ -21,7 +21,7 @@ message FileData {
     string path = 2;
     bytes size = 3;
     string data = 4;
-    int32 checksum = 5;
+    bytes checksum = 5;
     string senderId = 6;
     repeated Chunk chunk = 7;
     Node node = 8;

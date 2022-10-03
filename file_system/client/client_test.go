@@ -23,6 +23,9 @@ func TestBasicClient(t *testing.T) {
 	testId := "storageTestId"
 	testId2 := "storageTestId2"
 
+	savePathStorageNode0 := "sn0"
+	savePathStorageNode1 := "sn1"
+
 	var members []string
 
 	// Chunk size is in bytes, storage node size in MB
@@ -48,13 +51,13 @@ func TestBasicClient(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	go func(id string) {
-		storageNode := storage.NewStorageNode(testId, storageSize, storageHost, storagePort0, testConfig)
+		storageNode := storage.NewStorageNode(testId, storageSize, storageHost, storagePort0, testConfig, savePathStorageNode0 )
 		storageNode.Start()
 		time.Sleep(time.Second * 1)
 	}(testId)
 
 	go func(id string) {
-		storageNode := storage.NewStorageNode(testId2, storageSize, storageHost, storagePort1, testConfig)
+		storageNode := storage.NewStorageNode(testId2, storageSize, storageHost, storagePort1, testConfig, savePathStorageNode1 )
 		storageNode.Start()
 	}(testId2)
 
@@ -102,6 +105,13 @@ func TestClientUpload(t *testing.T) {
 	testStorageNode4 := "testStorageNode4"
 	testClientId0 := "clientId0"
 
+	savePathStorageNode0 := "sn0"
+	savePathStorageNode1 := "sn1"
+	savePathStorageNode2 := "sn2"
+	savePathStorageNode3 := "sn3"
+	savePathStorageNode4 := "sn4"
+
+
 	var members []string
 
 	go func(receivedMembers *[]string) {
@@ -114,28 +124,28 @@ func TestClientUpload(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	go func() {
-		storageNode := storage.NewStorageNode(testStorageNode0, size, storageHost, storagePort0, testConfig)
+		storageNode := storage.NewStorageNode(testStorageNode0, size, storageHost, storagePort0, testConfig, savePathStorageNode0)
 		storageNode.Start()
 		time.Sleep(time.Second * 1)
 	}()
 
 	go func() {
-		storageNode := storage.NewStorageNode(testStorageNode1, size, storageHost, storagePort1, testConfig)
+		storageNode := storage.NewStorageNode(testStorageNode1, size, storageHost, storagePort1, testConfig, savePathStorageNode1)
 		storageNode.Start()
 	}()
 
 	go func() {
-		storageNode := storage.NewStorageNode(testStorageNode2, size, storageHost, storagePort2, testConfig)
+		storageNode := storage.NewStorageNode(testStorageNode2, size, storageHost, storagePort2, testConfig, savePathStorageNode2)
 		storageNode.Start()
 	}()
 
 	go func() {
-		storageNode := storage.NewStorageNode(testStorageNode3, size, storageHost, storagePort3, testConfig)
+		storageNode := storage.NewStorageNode(testStorageNode3, size, storageHost, storagePort3, testConfig, savePathStorageNode3)
 		storageNode.Start()
 	}()
 
 	go func() {
-		storageNode := storage.NewStorageNode(testStorageNode4, size, storageHost, storagePort4, testConfig)
+		storageNode := storage.NewStorageNode(testStorageNode4, size, storageHost, storagePort4, testConfig, savePathStorageNode4)
 		storageNode.Start()
 	}()
 
@@ -156,10 +166,25 @@ func TestClientUpload(t *testing.T) {
 }
 
 func TestClientUploadData(t *testing.T) {
+	defer func() {
+		name := "this_test_path_footxt_"
+		for i := 0; i<10 ; i++ {
+			newName := fmt.Sprintf("%s%d", name, i)
+			for j := 0; j < 4; j++ {
+				os.Remove("./sn" + string(j) + "/" + newName)
+				dirName := fmt.Sprintf("./sn%d", j)
+				os.Remove(dirName)
+			}
+		}
+	}()
+
 	controllerHost := "localhost"
 	storageHost := "localhost"
 	controllerPort := 12050
 	var storagePort0 int32 = 12051
+	var storagePort1 int32 = 12052
+	var storagePort2 int32 = 12053
+	var storagePort3 int32 = 12054
 
 	var size int64 = 1000000
 	var chunkSize int64 = 5000000
@@ -177,7 +202,15 @@ func TestClientUploadData(t *testing.T) {
 	localPath := "testdata/testFile.txt"
 
 	testStorageNode0 := "testStorageNode0"
+	testStorageNode1 := "testStorageNode1"
+	testStorageNode2 := "testStorageNode2"
+	testStorageNode3 := "testStorageNode3"
 	testClientId0 := "clientId0"
+
+	savePathStorageNode0 := "sn0"
+	savePathStorageNode1 := "sn1"
+	savePathStorageNode2 := "sn2"
+	savePathStorageNode3 := "sn3"
 
 	var members []string
 
@@ -191,9 +224,23 @@ func TestClientUploadData(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	go func() {
-		storageNode := storage.NewStorageNode(testStorageNode0, size, storageHost, storagePort0, testConfig)
+		storageNode := storage.NewStorageNode(testStorageNode0, size, storageHost, storagePort0, testConfig, savePathStorageNode0)
 		storageNode.Start()
-		time.Sleep(time.Second * 1)
+	}()
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode1, size, storageHost, storagePort1, testConfig, savePathStorageNode1)
+		storageNode.Start()
+	}()
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode2, size, storageHost, storagePort2, testConfig, savePathStorageNode2)
+		storageNode.Start()
+	}()
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode3, size, storageHost, storagePort3, testConfig, savePathStorageNode3)
+		storageNode.Start()
 	}()
 
 	time.Sleep(time.Second * 3)
@@ -202,14 +249,7 @@ func TestClientUploadData(t *testing.T) {
 		testClient.Start()
 	}(controllerPort, testClientId0)
 
-	time.Sleep(time.Second * 10)
-
-	name := "this_test_path_footxt_"
-	for i := 0; i<10 ; i++ {
-		//newName := name + string(i)
-		newName := fmt.Sprintf("%s%d", name, i)
-		os.Remove(newName)
-	}
+	time.Sleep(time.Second * 30)
 
 	// TODO complete test to validate file is saved
 	if 1 != 1 {
@@ -226,16 +266,19 @@ func TestClientDownloadSimple(t *testing.T) {
 			log.Printf("Unable to delete file at %s", savePath)
 		}
 	}(savePath)
-	name := "this_test_path_footxt_"
-	defer func(name string) {
+	defer func() {
+		name := "this_test_path_footxt_"
 		for i := 0; i<10 ; i++ {
 			newName := fmt.Sprintf("%s%d", name, i)
-			err := os.Remove(newName)
-			if err != nil {
-				log.Printf("Unable to delete files at %s", name)
+			for j := 0; j < 5; j++ {
+				fullPath := fmt.Sprintf("./sn%d/%s", j, newName)
+				os.Remove(fullPath)
+				dirName := fmt.Sprintf("./sn%d", j)
+				os.Remove(dirName)
 			}
 		}
-	}(name)
+	}()
+
 	controllerHost := "localhost"
 	storageHost := "localhost"
 	controllerPort := 12043
@@ -267,6 +310,12 @@ func TestClientDownloadSimple(t *testing.T) {
 	testStorageNode4 := "testStorageNode4"
 	testClientId0 := "clientId0"
 
+	savePathStorageNode0 := "sn0"
+	savePathStorageNode1 := "sn1"
+	savePathStorageNode2 := "sn2"
+	savePathStorageNode3 := "sn3"
+	savePathStorageNode4 := "sn4"
+
 	var members []string
 
 	go func(receivedMembers *[]string) {
@@ -279,28 +328,28 @@ func TestClientDownloadSimple(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	go func() {
-		storageNode := storage.NewStorageNode(testStorageNode0, size, storageHost, storagePort0, testConfig)
+		storageNode := storage.NewStorageNode(testStorageNode0, size, storageHost, storagePort0, testConfig, savePathStorageNode0)
 		storageNode.Start()
 		time.Sleep(time.Second * 1)
 	}()
 
 	go func() {
-		storageNode := storage.NewStorageNode(testStorageNode1, size, storageHost, storagePort1, testConfig)
+		storageNode := storage.NewStorageNode(testStorageNode1, size, storageHost, storagePort1, testConfig, savePathStorageNode1)
 		storageNode.Start()
 	}()
 
 	go func() {
-		storageNode := storage.NewStorageNode(testStorageNode2, size, storageHost, storagePort2, testConfig)
+		storageNode := storage.NewStorageNode(testStorageNode2, size, storageHost, storagePort2, testConfig, savePathStorageNode2)
 		storageNode.Start()
 	}()
 
 	go func() {
-		storageNode := storage.NewStorageNode(testStorageNode3, size, storageHost, storagePort3, testConfig)
+		storageNode := storage.NewStorageNode(testStorageNode3, size, storageHost, storagePort3, testConfig, savePathStorageNode3)
 		storageNode.Start()
 	}()
 
 	go func() {
-		storageNode := storage.NewStorageNode(testStorageNode4, size, storageHost, storagePort4, testConfig)
+		storageNode := storage.NewStorageNode(testStorageNode4, size, storageHost, storagePort4, testConfig, savePathStorageNode4)
 		storageNode.Start()
 	}()
 

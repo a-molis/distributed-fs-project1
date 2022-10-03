@@ -1,6 +1,7 @@
 package client
 
 import (
+	"crypto/md5"
 	. "dfs/atomic_data"
 	. "dfs/config"
 	"dfs/connection"
@@ -27,7 +28,6 @@ type chunkMeta struct {
 	name string
 	size int64
 	Nodes []*connection.Node
-	data []byte
 	num int32
 }
 
@@ -237,12 +237,17 @@ func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) {
 		message.Path = chunkName
 		message.DataSize = chunkMetaMap[chunkName].size
 		message.Nodes = chunkMetaMap[chunkName].Nodes
+		//we need to also send the file path at the destination
+		message.Data = client.remotePath
 		//message.checksum TODO
+		sum := md5.Sum(chunkData)
+		message.Checksum = sum[:] //create a slice to convert from [16]byte to []byte
 
 		err = conHandler.Send(message)
 		if err != nil {
 			fmt.Println("Error sending chunk metadata to storage node")
 		}
+		log.Println("Client sent chunk metadata to storage node")
 		// wait for ack
 		result, err := conHandler.Receive()
 		if err != nil || result.MessageType != connection.MessageType_ACK_PUT {
@@ -253,6 +258,7 @@ func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) {
 		if err != nil {
 			fmt.Println("Error sending chunk payload to storage node")
 		}
+		log.Println("Client wrote the chunk data to node stream")
 		//wait for ack
 		result, err = conHandler.Receive()
 		if err != nil || result.MessageType != connection.MessageType_ACK_PUT {
@@ -293,27 +299,6 @@ func getConnectionHandler(node *connection.Node, handlerMap map[string]*Blocking
 	return blockingConnection
 }
 
-func (client *Client) getChunkData(chunkMetaMap map[string]*chunkMeta) error {
-	file, err := os.Open(client.localPath)
-	if err != nil {
-		log.Println("Cannot open target file")
-		return err
-	}
-
-	for chunkName := range chunkMetaMap {
-		chunkData := make([]byte, chunkMetaMap[chunkName].size)
-		numBytes, err := file.Read(chunkData)
-		if err != nil {
-			log.Println("Error reading bytes from target file", err)
-			return err
-		}
-		if int64(numBytes) != chunkMetaMap[chunkName].size {
-			log.Println("Did not read same bytes as chunk size", chunkName)
-		}
-		chunkMetaMap[chunkName].data = chunkData
-	}
-	return nil
-}
 
 func (client *Client) get(result *connection.FileData, handler *connection.ConnectionHandler) {
 	chunks := result.Chunk

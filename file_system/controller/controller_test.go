@@ -11,6 +11,7 @@ import (
 func TestController(t *testing.T) {
 	testId := "storageTestId"
 	var storagePort0 int32 = 12041
+	savePathStorageNode0 := "sn0"
 
 	var members []string
 
@@ -35,7 +36,7 @@ func TestController(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	go func(id string) {
-		storageNode := storage.NewStorageNode(id, size, "localHost", storagePort0, testConfig)
+		storageNode := storage.NewStorageNode(id, size, "localHost", storagePort0, testConfig, savePathStorageNode0)
 		storageNode.Start()
 	}(testId)
 
@@ -51,6 +52,7 @@ func TestController(t *testing.T) {
 func TestHeartBeatInactive(t *testing.T) {
 	testId := "storageTestId"
 	var storagePort0 int32 = 12038
+	savePathStorageNode0 := "sn0"
 
 	var members []string
 
@@ -75,7 +77,7 @@ func TestHeartBeatInactive(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	go func(id string) {
-		storageNode := storage.NewStorageNode(id, size, "localHost", storagePort0, testConfig)
+		storageNode := storage.NewStorageNode(id, size, "localHost", storagePort0, testConfig, savePathStorageNode0)
 		storageNode.Start()
 		storageNode.Shutdown()
 	}(testId)
@@ -92,6 +94,7 @@ func TestHeartBeatInactive(t *testing.T) {
 func TestHeartBeat(t *testing.T) {
 	testId := "storageTestId"
 	var storagePort0 int32 = 12037
+	savePathStorageNode0 := "sn0"
 
 	var members []string
 
@@ -116,7 +119,7 @@ func TestHeartBeat(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	go func( id string) {
-		storageNode := storage.NewStorageNode(id, size, "localHost", storagePort0, testConfig)
+		storageNode := storage.NewStorageNode(id, size, "localHost", storagePort0, testConfig, savePathStorageNode0)
 		storageNode.Start()
 	}(testId)
 
@@ -134,6 +137,8 @@ func TestHeartBeatMultiNode(t *testing.T) {
 	testId2 := "storageTestId2"
 	var storagePort0 int32 = 12039
 	var storagePort1 int32 = 12040
+	savePathStorageNode0 := "sn0"
+	savePathStorageNode1 := "sn1"
 
 	var members []string
 
@@ -158,14 +163,14 @@ func TestHeartBeatMultiNode(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	go func(id string) {
-		storageNode := storage.NewStorageNode(id, size, "localHost", storagePort0, testConfig)
+		storageNode := storage.NewStorageNode(id, size, "localHost", storagePort0, testConfig, savePathStorageNode0)
 		go storageNode.Start()
 		time.Sleep(time.Second * 1)
 		storageNode.Shutdown()
 	}(testId)
 
 	go func(id string) {
-		storageNode := storage.NewStorageNode(id, size, "localHost", storagePort1, testConfig)
+		storageNode := storage.NewStorageNode(id, size, "localHost", storagePort1, testConfig, savePathStorageNode1)
 		storageNode.Start()
 	}(testId2)
 
