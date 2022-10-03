@@ -367,7 +367,7 @@ func TestClientDownloadSimple(t *testing.T) {
 		testClient.Start()
 	}(controllerPort, testClientId0)
 
-	time.Sleep(time.Second * 4)
+	time.Sleep(time.Second * 15)
 
 	// TODO complete test to validate file is saved
 	if 1 != 1 {

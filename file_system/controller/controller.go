@@ -76,7 +76,27 @@ func (controller *Controller) handleConnection(connectionHandler *connection.Con
 		} else if message.MessageType == connection.MessageType_DUMMY {
 			// nothing to see here
 			// TODO fix this nothing
+		} else if message.MessageType == connection.MessageType_CHECKSUM {
+			go controller.updateCheckSum(connectionHandler, message)
 		}
+	}
+}
+
+func (controller *Controller) updateCheckSum(handler *connection.ConnectionHandler, message *connection.FileData) {
+	checkSum := message.Checksum
+	path := message.Path
+	err := controller.fileMetadata.UpdateChecksum(path, checkSum)
+	ack := &connection.FileData{}
+	if err != nil {
+		log.Printf("Error saving checksum for file %s %s\n", path, err)
+		ack.MessageType = connection.MessageType_ERROR
+	} else {
+		ack.MessageType = connection.MessageType_ACK
+		log.Println("updated Checksum for file")
+	}
+	err = handler.Send(ack)
+	if err != nil {
+		log.Printf("Error sending message for check sum ack for %s %s", path, err)
 	}
 }
 
@@ -218,7 +238,7 @@ func (controller *Controller) getHandler(handler *connection.ConnectionHandler, 
 	sendMessage := &connection.FileData{}
 
 	// TODO add check if in pending state
-	chunks, err := controller.fileMetadata.Download(message.Path)
+	chunks, checksum, err := controller.fileMetadata.Download(message.Path)
 	if err != nil {
 		sendMessage.Data = fmt.Sprintf("%s", err)
 		sendMessage.MessageType = connection.MessageType_ERROR
@@ -228,6 +248,7 @@ func (controller *Controller) getHandler(handler *connection.ConnectionHandler, 
 		}
 		return
 	}
+	sendMessage.Checksum = checksum
 	sendMessage.Chunk = chunkToProto(chunks, controller.memberTable)
 	sendMessage.MessageType = connection.MessageType_GET
 	err = handler.Send(sendMessage)

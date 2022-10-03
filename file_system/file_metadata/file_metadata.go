@@ -84,16 +84,16 @@ func (fileMetadata *FileMetadata) Ls(path string) string {
 	return strings.TrimSuffix(res, " ")
 }
 
-func (fileMetadata *FileMetadata) Download(path string) ([]*Chunk, error) {
+func (fileMetadata *FileMetadata) Download(path string) ([]*Chunk, []byte, error) {
 	pathSplit := strings.Split(path, "/")
 	fileName := pathSplit[len(pathSplit)-1]
 	directoryPath := strings.Replace(path, fileName, "", -1)
 	directoryNode := getNode(fileMetadata.rootNode, directoryPath, false)
 	if directoryNode == nil {
-		return nil, errors.New("File does not exist")
+		return nil, nil, errors.New("File does not exist")
 	}
 	file := directoryNode.Files[fileName]
-	return file.Chunks, nil
+	return file.Chunks, file.Checksum, nil
 }
 
 func (fileMetadata *FileMetadata) PathExists(path string) bool {
@@ -135,6 +135,19 @@ func (fileMetadata *FileMetadata) LoadBytes(bytes []byte) error {
 	return err
 }
 
+func (fileMetadata *FileMetadata) UpdateChecksum(path string, sum []byte) error {
+	pathSplit := strings.Split(path, "/")
+	fileName := pathSplit[len(pathSplit)-1]
+	directoryPath := strings.Replace(path, fileName, "", -1)
+	directoryNode := getNode(fileMetadata.rootNode, directoryPath, false)
+	if directoryNode == nil {
+		return errors.New("File does not exist")
+	}
+	file := directoryNode.Files[fileName]
+	file.Checksum = sum
+	return nil
+}
+
 type Node struct {
 	Path  string
 	Dirs  map[string]*Node
@@ -154,7 +167,7 @@ type File struct {
 	Name          string
 	Chunks        []*Chunk //TODO Map
 	Status        Status
-	Checksum      int32
+	Checksum      []byte
 	PendingChunks int
 }
 

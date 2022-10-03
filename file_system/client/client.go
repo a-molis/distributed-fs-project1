@@ -2,12 +2,16 @@ package client
 
 import (
 	"crypto/md5"
+	"crypto/sha256"
 	. "dfs/atomic_data"
 	. "dfs/config"
 	"dfs/connection"
+	"errors"
 	"fmt"
+	"hash"
 	"log"
 	"os"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -144,7 +148,28 @@ func (client *Client) put(result *connection.FileData, connectionHandler *connec
 	// map with storage node and connection handler
 	// generate the chunks-data as byte arrays
 	// send the chunk data to corresponding node
-	client.sendChunksToNodes(chunkMetaMap)
+	checkSum := client.sendChunksToNodes(chunkMetaMap)
+	err = client.sendCheckSumToController(checkSum, connectionHandler)
+	if err != nil {
+		log.Fatalln("Error sending checksum to controller ", err)
+	}
+}
+
+func (client *Client) sendCheckSumToController(checkSum []byte, handler *connection.ConnectionHandler) error {
+	message := &connection.FileData{}
+	message.MessageType = connection.MessageType_CHECKSUM
+	message.Checksum = checkSum
+	message.Path = client.remotePath
+	err := handler.Send(message)
+	if err != nil {
+		return err
+	}
+	ack, err := handler.Receive()
+	if err != nil || ack.MessageType != connection.MessageType_ACK {
+		log.Println("Error receiving ack from controller for file checksum ", err)
+		return errors.New("Error sending checksum to controller")
+	}
+	return nil
 }
 
 func (client *Client) getChunkMeta() (map[string]*chunkMeta, error) {
@@ -207,23 +232,24 @@ type BlockingConnection struct {
 	mu sync.Mutex
 }
 
-func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) {
+func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) []byte {
 
 	blockingHandlerMap := make(map[string]*BlockingConnection)
 
 	file, err := os.Open(client.localPath)
 	if err != nil {
 		log.Println("Cannot open target file")
-		return
+		return nil
 	}
+	hash := sha256.New()
 	for chunkName := range chunkMetaMap {
-		//TODO do this bit as a go routine
 
 		chunkData, err:= getChunkData(chunkMetaMap, chunkName, file)
 		if err != nil {
 			fmt.Println("Error getting chunk data for chunk ", chunkName)
 		}
-
+		hash.Write(chunkData)
+		//TODO do this bit as a go routine
 		node := chunkMetaMap[chunkName].Nodes[0]
 		blockingHandler := getConnectionHandler(node, blockingHandlerMap)
 
@@ -268,6 +294,7 @@ func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) {
 		log.Println("sent chunk info to storage node ", chunkName)
 		blockingHandler.mu.Unlock()
 	}
+	return hash.Sum(nil)
 }
 
 func getChunkData(chunkMetaMap map[string]*chunkMeta, chunkName string, file *os.File) ([]byte, error) {
@@ -301,6 +328,8 @@ func getConnectionHandler(node *connection.Node, handlerMap map[string]*Blocking
 
 
 func (client *Client) get(result *connection.FileData, handler *connection.ConnectionHandler) {
+	savedChecksum := result.Checksum
+	log.Println(len(savedChecksum))
 	chunks := result.Chunk
 	sort.SliceStable(chunks, func(i, j int) bool {
 		return chunks[i].Num < chunks[j].Num
@@ -313,10 +342,29 @@ func (client *Client) get(result *connection.FileData, handler *connection.Conne
 	numChunks := int32(len(chunks))
 	nextChunkNum := NewAtomicInt(&chunks[0].Num)
 	saveLock := NewWaitNotify()
-	go client.saveData(numChunks, downloadChan, saveLock)
+	var done *bool
+	f := false
+	done = &f
+	checkSum := sha256.New()
+	go client.saveData(numChunks, downloadChan, saveLock, checkSum, done)
 
 	for _, chunk := range chunks {
 		go getChunkFromStorage(chunk, blockingHandlerMap, nextChunkNum, saveLock, downloadChan)
+	}
+
+	saveLock.Cond.L.Lock()
+	for true {
+		if !*done {
+			fmt.Println("locking end lock done ", *done)
+			saveLock.Cond.Wait()
+		} else {
+			if reflect.DeepEqual(savedChecksum, checkSum) {
+				log.Fatalln("Error saving file, checksums do not match")
+			} else {
+				log.Println("File checksums match")
+			}
+			break
+		}
 	}
 }
 
@@ -382,9 +430,7 @@ func getBytesFromStorage(conn *connection.ConnectionHandler, chunk *connection.C
 	return byteData, nil
 }
 
-
-
-func (client *Client) saveData(numChunks int32, downloadChan chan []byte, saveLock *WaitNotify) {
+func (client *Client) saveData(numChunks int32, downloadChan chan []byte, saveLock *WaitNotify, hash hash.Hash, done *bool) {
 	file, err := os.OpenFile(client.localPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Fatalln("Failed to open file on client for saving data ", err)
@@ -392,12 +438,16 @@ func (client *Client) saveData(numChunks int32, downloadChan chan []byte, saveLo
 	for i := numChunks; i > 0; i-- {
 		data := <- downloadChan
 		write, err := file.Write(data)
+		hash.Write(data)
 		if err != nil || write != len(data) {
 			log.Fatalln("Error writing to save file ", err)
 		}
 		log.Printf("recevied data of size %d\n", len(data))
 		saveLock.Cond.Broadcast()
 	}
+	*done = true;
+	fmt.Println("done at the end of save ", *done)
+	saveLock.Cond.Broadcast()
 }
 
 func clientChunkToProto(chunkMeta *chunkMeta) *connection.Chunk {

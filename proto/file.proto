@@ -14,6 +14,7 @@ enum MessageType {
     ACK_PUT = 9;
     LS = 10;
     ACK_GET = 11;
+    CHECKSUM = 12;
 }
 
 message FileData {
