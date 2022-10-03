@@ -33,7 +33,7 @@ func (fileMetadata *FileMetadata) Upload(path string) error {
 	return nil
 }
 
-func (fileMetadata *FileMetadata) UploadChunks(path string, chunks []*Chunk) error {
+func (fileMetadata *FileMetadata) UploadChunks(path string, chunks map[string]*Chunk) error {
 	pathSplit := strings.Split(path, "/")
 	fileName := pathSplit[len(pathSplit)-1]
 	directoryPath := strings.Replace(path, fileName, "", -1)
@@ -47,9 +47,17 @@ func (fileMetadata *FileMetadata) UploadChunks(path string, chunks []*Chunk) err
 	file.Name = fileName
 	file.Status = Pending
 	file.Chunks = chunks
-	file.PendingChunks = len(chunks)
+	file.PendingChunks = len(chunks) * 3 //TODO make this times 3
 	directoryNode.Files[fileName] = file
 	return nil
+}
+
+func chunkArrayToMap(chunks []*Chunk) map[string]*Chunk{
+	res := make(map[string]*Chunk)
+	for _, c := range chunks {
+		res[c.Name] = c
+	}
+	return res
 }
 
 func getNode(node *Node, path string, write bool) *Node {
@@ -84,7 +92,8 @@ func (fileMetadata *FileMetadata) Ls(path string) string {
 	return strings.TrimSuffix(res, " ")
 }
 
-func (fileMetadata *FileMetadata) Download(path string) ([]*Chunk, []byte, error) {
+
+func (fileMetadata *FileMetadata) Download(path string) (map[string]*Chunk, []byte, error) {
 	pathSplit := strings.Split(path, "/")
 	fileName := pathSplit[len(pathSplit)-1]
 	directoryPath := strings.Replace(path, fileName, "", -1)
@@ -148,6 +157,21 @@ func (fileMetadata *FileMetadata) UpdateChecksum(path string, sum []byte) error 
 	return nil
 }
 
+func (fileMetadata *FileMetadata) HeartbeatHandler(path string, chunk string) bool{
+	pathSplit := strings.Split(path, "/")
+	fileName := pathSplit[len(pathSplit)-1]
+	directoryPath := strings.Replace(path, fileName, "", -1)
+	directoryNode := getNode(fileMetadata.rootNode, directoryPath, false)
+	file := directoryNode.Files[fileName]
+	file.Chunks[chunk].Status = Complete
+	file.PendingChunks = file.PendingChunks - 1 //TODO This should really be threadsafe
+	if file.PendingChunks <= 0 {
+		file.Status = Complete
+		return true
+	}
+	return false
+}
+
 type Node struct {
 	Path  string
 	Dirs  map[string]*Node
@@ -165,7 +189,7 @@ func newNode(path string) *Node {
 // TODO chunks to use set data type
 type File struct {
 	Name          string
-	Chunks        []*Chunk //TODO Map
+	Chunks        map[string]*Chunk //TODO Map //this is used for changing the status of chunk 246
 	Status        Status
 	Checksum      []byte
 	PendingChunks int

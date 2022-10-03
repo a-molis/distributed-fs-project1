@@ -8,8 +8,8 @@ import (
 	"math/rand"
 )
 
-func ProtoToChunk(chunks []*connection.Chunk) []*file_metadata.Chunk {
-	res := make([]*file_metadata.Chunk, 0)
+func ProtoToChunk(chunks []*connection.Chunk) map[string]*file_metadata.Chunk {
+	res := make(map[string]*file_metadata.Chunk)
 	for _, c := range chunks {
 		newChunk := &file_metadata.Chunk{}
 		newChunk.Name = c.Name
@@ -17,12 +17,12 @@ func ProtoToChunk(chunks []*connection.Chunk) []*file_metadata.Chunk {
 		newChunk.Status = file_metadata.Pending
 		newChunk.Size = c.Size
 		newChunk.Num = c.Num
-		res = append(res, newChunk)
+		res[c.Name] = newChunk
 	}
 	return res
 }
 
-func chunkToProto(chunks []*file_metadata.Chunk, memberTable *MemberTable) []*connection.Chunk {
+func chunkToProto(chunks map[string]*file_metadata.Chunk, memberTable *MemberTable) []*connection.Chunk {
 	res := make([]*connection.Chunk, 0)
 	for _, c := range chunks {
 		newChunk := &connection.Chunk{}
@@ -49,7 +49,7 @@ func generateNodes(ids []string, memberTable *MemberTable) []*connection.Node {
 }
 
 // TODO move this to function in member table
-func findAvailableNodes(chunks []*file_metadata.Chunk, memberTable *MemberTable, numReplicas int) error {
+func findAvailableNodes(chunks map[string]*file_metadata.Chunk, memberTable *MemberTable, numReplicas int) error {
 	listOfNodes := make([]string, 0)
 	if len(memberTable.members) < 1 {
 		err := errors.New("Erorr finding any available nodes member table empty")

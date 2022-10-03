@@ -87,7 +87,7 @@ func (storageNode *StorageNode) heartbeat() {
 	message := &connection.FileData{}
 	message.MessageType = connection.MessageType_HEARTBEAT
 	message.SenderId = storageNode.id
-	message.Size = storageNode.size.Bytes()
+	message.Size = storageNode.size.Bytes() //TODO this information should be sent in registration instead
 	for storageNode.running {
 		storageNode.connectionHandler.Send(message)
 		time.Sleep(heartBeatRate)
@@ -163,11 +163,23 @@ func (storageNode *StorageNode) uploadHandler(connectionHandler *connection.Conn
 	connectionHandler.Send(response)
 
 	// TODO send some heartbeat with info
+	storageNode.chunkHeartbeat(message)
 
 	//begin replication
 	if len(message.Nodes) > 1 {
 		storageNode.replicationHandler(data, message)
 	}
+}
+
+func (storageNode *StorageNode) chunkHeartbeat(message *connection.FileData) {
+	heartbeatMessage := &connection.FileData{}
+	heartbeatMessage.SenderId = storageNode.id
+	heartbeatMessage.MessageType = connection.MessageType_HEARTBEAT_CHUNK
+	heartbeatMessage.Path = message.Data //this is the file path
+	heartbeatMessage.Data = message.Path //this is the chunk name
+	heartbeatMessage.Checksum = message.Checksum
+
+	storageNode.connectionHandler.Send(heartbeatMessage)
 }
 
 func (storageNode *StorageNode) replicationHandler(chunkData []byte, message *connection.FileData) {

@@ -61,7 +61,8 @@ func (controller *Controller) handleConnection(connectionHandler *connection.Con
 		}
 		if message.MessageType == connection.MessageType_REGISTRATION {
 			go controller.registerHandler(connectionHandler, message)
-		} else if message.MessageType == connection.MessageType_HEARTBEAT {
+		} else if message.MessageType == connection.MessageType_HEARTBEAT ||
+			message.MessageType == connection.MessageType_HEARTBEAT_CHUNK {
 			go controller.heartbeatHandler(connectionHandler, message)
 		} else if message.MessageType == connection.MessageType_LS {
 			go controller.Ls(connectionHandler, lsChan, message)
@@ -119,10 +120,16 @@ func (controller *Controller) registerHandler(connectionHandler *connection.Conn
 
 func (controller *Controller) heartbeatHandler(connectionHandler *connection.ConnectionHandler, message *connection.FileData) {
 	log.Println("Received heart beat from ", message.SenderId)
+	controller.memberTable.RecordBeat(message.SenderId)
 	//TODO update file metadata with info that is passed in heartbeat
 		//^^ returns a boolean
 		//depending on boolean save file metadata
-	controller.memberTable.RecordBeat(message.SenderId)
+		// we still update the chunk info so it might be best to save it regardless
+	if message.MessageType == connection.MessageType_HEARTBEAT_CHUNK {
+		// call some function here
+		controller.fileMetadata.HeartbeatHandler(message.Path, message.Data)
+		controller.SaveFileMetadata()
+	}
 }
 
 func (controller *Controller) List() []string {
