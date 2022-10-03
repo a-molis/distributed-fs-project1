@@ -17,7 +17,11 @@ Running ls with client
 ```
 
 Run controller
-`./dfs -type=controller -host=localhost -port=12999 -id=controller1`
+```bash
+./dfs -type=controller -host=localhost -port=12999 -id=controller1
+```
 
 Run a storage node with 1GB in size
-`./dfs -type=storage -host=localhost -port=12998 -id=storage0 -storage_size=1000000
+```bash
+./dfs -type=storage -host=localhost -port=12998 -id=storage0 -storage_size=1000000 -local_path=/path/to/data
+```

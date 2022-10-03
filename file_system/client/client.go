@@ -41,6 +41,11 @@ type Node struct {
 	Port     int32
 }
 
+type BlockingConnection struct {
+	conHandler *connection.ConnectionHandler
+	mu         sync.Mutex
+}
+
 func NewClient(config *Config, command string, args ...string) *Client {
 	client := &Client{}
 	client.config = config
@@ -111,8 +116,6 @@ func (client *Client) sendToController(err error, message *connection.FileData, 
 		log.Println("Error receiving data from controller on the client")
 		return errors.New("error receiving data from controller on the client")
 	}
-	log.Printf("Client received message back from controller")
-
 	if result.MessageType == connection.MessageType_LS {
 		log.Printf("Client received ls message back from controller")
 		return client.ls(result, connectionHandler)
@@ -121,6 +124,8 @@ func (client *Client) sendToController(err error, message *connection.FileData, 
 		return client.put(result, connectionHandler)
 	} else if result.MessageType == connection.MessageType_GET {
 		return client.get(result, connectionHandler)
+	} else if result.MessageType == connection.MessageType_RM {
+		return client.rm(result, connectionHandler)
 	} else if result.MessageType == connection.MessageType_ERROR {
 		log.Println("Error: ", result.Data)
 		return errors.New(fmt.Sprintf("Error: %s", result.Data))
@@ -128,7 +133,6 @@ func (client *Client) sendToController(err error, message *connection.FileData, 
 		log.Println("Error client unable to get result from controller")
 		return errors.New("error client unable to get result from controller")
 	}
-	return nil
 }
 
 func (client *Client) ls(result *connection.FileData, connectionHandler *connection.ConnectionHandler) error {
@@ -245,11 +249,6 @@ func (client *Client) sendChunkInfoController(handler *connection.ConnectionHand
 	return nil
 }
 
-type BlockingConnection struct {
-	conHandler *connection.ConnectionHandler
-	mu         sync.Mutex
-}
-
 func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) ([]byte, error) {
 
 	blockingHandlerMap := make(map[string]*BlockingConnection)
@@ -264,7 +263,7 @@ func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) ([]b
 
 		chunkData, err := getChunkData(chunkMetaMap, chunkName, file)
 		if err != nil {
-			fmt.Println("Error getting chunk data for chunk ", chunkName)
+			log.Println("Error getting chunk data for chunk ", chunkName)
 			return nil, err
 		}
 		checksum.Write(chunkData)
@@ -474,6 +473,22 @@ func (client *Client) saveData(numChunks int32, downloadChan chan []byte, saveLo
 	}
 	*done = true
 	saveLock.Cond.Broadcast()
+}
+
+func (client *Client) rm(result *connection.FileData, handler *connection.ConnectionHandler) error {
+	path := client.remotePath
+	chunkData, err := handler.Receive()
+	if err != nil {
+		log.Printf("Error getting data for delete %s\n", err)
+		return err
+	}
+	if chunkData.MessageType != connection.MessageType_RM {
+		log.Printf("Unable to remove data from controller from client %s %s\n", path, err)
+		return errors.New(chunkData.Data)
+	}
+	log.Printf("Number of chunks to remvoe %d\n", len(chunkData.Chunk))
+	fmt.Printf("Removed %s\n", path)
+	return nil
 }
 
 func clientChunkToProto(chunkMeta *chunkMeta) *connection.Chunk {

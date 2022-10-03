@@ -285,3 +285,113 @@ func TestClientDownloadSimple(t *testing.T) {
 	}
 	return
 }
+
+func TestClientRmSimple(t *testing.T) {
+	defer func() {
+		name := "this_test_path_footxt_"
+		for i := 0; i < 10; i++ {
+			newName := fmt.Sprintf("%s%d", name, i)
+			for j := 0; j < 5; j++ {
+				fullPath := fmt.Sprintf("./sn%d/%s", j, newName)
+				os.Remove(fullPath)
+				dirName := fmt.Sprintf("./sn%d", j)
+				os.Remove(dirName)
+			}
+		}
+	}()
+
+	controllerHost := "localhost"
+	storageHost := "localhost"
+	controllerPort := 12055
+	var storagePort0 int32 = 12056
+	var storagePort1 int32 = 12057
+	var storagePort2 int32 = 12058
+	var storagePort3 int32 = 12059
+	var storagePort4 int32 = 12060
+	var size int64 = 1000000
+	var chunkSize int64 = 5000000
+
+	testConfig, err := config.ConfigFromPath("../config.json")
+	if err != nil {
+		t.Errorf("Unable to open config")
+		return
+	}
+	testConfig.ChunkSize = chunkSize
+	testConfig.ControllerHost = controllerHost
+	testConfig.ControllerPort = controllerPort
+
+	remotePath := "/this/test/path/foo.txt"
+	localPath := "testdata/testFile.txt"
+
+	testStorageNode0 := "testStorageNode0"
+	testStorageNode1 := "testStorageNode1"
+	testStorageNode2 := "testStorageNode2"
+	testStorageNode3 := "testStorageNode3"
+	testStorageNode4 := "testStorageNode4"
+
+	savePathStorageNode0 := "sn0"
+	savePathStorageNode1 := "sn1"
+	savePathStorageNode2 := "sn2"
+	savePathStorageNode3 := "sn3"
+	savePathStorageNode4 := "sn4"
+
+	var members []string
+
+	go func(receivedMembers *[]string) {
+		testController := controller.NewController("testId", testConfig)
+		testController.Start()
+		time.Sleep(time.Second * 1)
+		*receivedMembers = testController.List()
+	}(&members)
+
+	time.Sleep(time.Second * 1)
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode0, size, storageHost, storagePort0, testConfig, savePathStorageNode0)
+		storageNode.Start()
+		time.Sleep(time.Second * 1)
+	}()
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode1, size, storageHost, storagePort1, testConfig, savePathStorageNode1)
+		storageNode.Start()
+	}()
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode2, size, storageHost, storagePort2, testConfig, savePathStorageNode2)
+		storageNode.Start()
+	}()
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode3, size, storageHost, storagePort3, testConfig, savePathStorageNode3)
+		storageNode.Start()
+	}()
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode4, size, storageHost, storagePort4, testConfig, savePathStorageNode4)
+		storageNode.Start()
+	}()
+
+	time.Sleep(time.Second * 3)
+	var clientPutError error = nil
+	go func() {
+		testClient := NewClient(testConfig, "put", remotePath, localPath)
+		clientPutError = testClient.Run()
+	}()
+
+	time.Sleep(time.Second * 6)
+
+	var clientRmError error = nil
+	go func() {
+		testClient := NewClient(testConfig, "rm", remotePath)
+		clientRmError = testClient.Run()
+	}()
+
+	time.Sleep(time.Second * 10)
+
+	// TODO complete test to validate file is saved
+	if clientPutError != nil || clientRmError != nil {
+		t.Fatalf("client test failed %s, %s", clientRmError, clientPutError)
+	}
+	return
+}

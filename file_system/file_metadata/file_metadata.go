@@ -170,6 +170,22 @@ func (fileMetadata *FileMetadata) HeartbeatHandler(path string, chunk string) bo
 	return false
 }
 
+func (fileMetadata *FileMetadata) Remove(path string) (map[string]*Chunk, error) {
+	pathSplit := strings.Split(path, "/")
+	fileName := pathSplit[len(pathSplit)-1]
+	directoryPath := strings.Replace(path, fileName, "", -1)
+	directoryNode := getNode(fileMetadata.rootNode, directoryPath, false)
+	if directoryNode == nil {
+		return nil, errors.New("unable to find directory")
+	}
+	file, ok := directoryNode.Files[fileName]
+	if !ok {
+		return nil, errors.New("file not found")
+	}
+	delete(directoryNode.Files, fileName)
+	return file.Chunks, nil
+}
+
 type Node struct {
 	Path  string
 	Dirs  map[string]*Node

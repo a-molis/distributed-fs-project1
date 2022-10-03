@@ -77,6 +77,8 @@ func (controller *Controller) handleConnection(connectionHandler *connection.Con
 		} else if message.MessageType == connection.MessageType_DUMMY {
 			// nothing to see here
 			// TODO fix this nothing
+		} else if message.MessageType == connection.MessageType_RM {
+			go controller.rmHandler(connectionHandler, message)
 		} else if message.MessageType == connection.MessageType_CHECKSUM {
 			go controller.updateCheckSum(connectionHandler, message)
 		}
@@ -259,4 +261,30 @@ func (controller *Controller) getHandler(handler *connection.ConnectionHandler, 
 	sendMessage.Chunk = chunkToProto(chunks, controller.memberTable)
 	sendMessage.MessageType = connection.MessageType_GET
 	err = handler.Send(sendMessage)
+}
+
+func (controller *Controller) rmHandler(handler *connection.ConnectionHandler, message *connection.FileData) {
+	deleteMessage := &connection.FileData{}
+	if message.Path == "" {
+		deleteMessage.MessageType = connection.MessageType_ERROR
+		err := handler.Send(deleteMessage)
+		if err != nil {
+			log.Println("Error sending error for missing path")
+		}
+		return
+	}
+	log.Printf("Removing path %s\n", message.Path)
+
+	chunks, err := controller.fileMetadata.Remove(message.Path)
+	deleteMessage.Chunk = chunkToProto(chunks, controller.memberTable)
+	if err != nil {
+		deleteMessage.Data = fmt.Sprintf("%s", err)
+		deleteMessage.MessageType = connection.MessageType_ERROR
+	} else {
+		deleteMessage.MessageType = connection.MessageType_RM
+	}
+	err = handler.Send(deleteMessage)
+	if err != nil {
+		log.Println("Error sending delete chunks to client")
+	}
 }
