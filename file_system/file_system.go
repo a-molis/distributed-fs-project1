@@ -54,7 +54,7 @@ func runClient(config *config.Config, command *string, localPath *string, remote
 		log.Fatalln("Invalid args for client")
 	}
 	newClient := client.NewClient(config, *command, *localPath, *remotePath)
-	newClient.Start()
+	newClient.Run()
 }
 
 func runController(id *string, config *config.Config) {

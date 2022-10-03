@@ -60,10 +60,11 @@ var (
 	}
 )
 
-func (client *Client) Start() {
+func (client *Client) Run() error {
 	messageType, ok := commandMap[strings.ToLower(client.command)]
 	if !ok {
-		log.Fatalln("Command not recognized ", client.command)
+		log.Println("Command not recognized ", client.command)
+		return errors.New("command not recognized")
 	}
 	message := &connection.FileData{}
 	message.MessageType = messageType
@@ -72,87 +73,103 @@ func (client *Client) Start() {
 		messageType == connection.MessageType_GET ||
 		messageType == connection.MessageType_PUT {
 		if len(client.args) < 1 {
-			log.Fatalln("Missing arguments")
+			log.Println("Missing arguments")
+			return errors.New("missing arguments")
 		}
 		client.remotePath = client.args[0]
 		message.Path = client.remotePath
 		if messageType == connection.MessageType_GET || messageType == connection.MessageType_PUT {
 			if len(client.args) < 2 {
-				log.Fatalln("Missing local path for get or put")
+				log.Println("Missing local path for get or put")
+				return errors.New("missing local path for get or put")
 			}
 			client.localPath = client.args[1]
 		}
 	}
 	connectionHandler, err := connection.NewClient(client.controllerHost, client.controllerPort)
 	if err != nil {
-		log.Fatalf("Error client unable to connect to Controller %s", err)
-		return
+		log.Printf("Error client unable to connect to Controller %s\n", err)
+		return errors.New(fmt.Sprintf("Error client unable to connect to Controller %s", err))
 	}
 	log.Printf("Client connected to controller")
 	client.connectionHandler = connectionHandler
 
 	// send command
-	client.sendToController(err, message, connectionHandler)
+	return client.sendToController(err, message, connectionHandler)
 }
 
-func (client *Client) sendToController(err error, message *connection.FileData, connectionHandler *connection.ConnectionHandler) {
+func (client *Client) sendToController(err error, message *connection.FileData, connectionHandler *connection.ConnectionHandler) error {
 	// TODO refactor to immediately enter method for specific messageType
 	err = client.connectionHandler.Send(message)
 	if err != nil {
-		log.Fatalln("Error sending data to controller")
+		log.Println("Error sending data to controller")
+		return errors.New("error sending data to controller")
 	}
 	log.Printf("Client sent command to server")
 	result, err := connectionHandler.Receive()
 	if err != nil {
-		log.Fatalln("Error receiving data from controller on the client")
+		log.Println("Error receiving data from controller on the client")
+		return errors.New("error receiving data from controller on the client")
 	}
 	log.Printf("Client received message back from controller")
 
 	if result.MessageType == connection.MessageType_LS {
 		log.Printf("Client received ls message back from controller")
-		client.ls(result, connectionHandler)
+		return client.ls(result, connectionHandler)
 	} else if result.MessageType == connection.MessageType_PUT {
 		log.Println("Client received put message")
-		client.put(result, connectionHandler)
+		return client.put(result, connectionHandler)
 	} else if result.MessageType == connection.MessageType_GET {
-		client.get(result, connectionHandler)
+		return client.get(result, connectionHandler)
 	} else if result.MessageType == connection.MessageType_ERROR {
-		log.Fatalln("Error: ", result.Data)
+		log.Println("Error: ", result.Data)
+		return errors.New(fmt.Sprintf("Error: %s", result.Data))
 	} else {
-		log.Fatalln("Error client unable to get result from controller")
+		log.Println("Error client unable to get result from controller")
+		return errors.New("error client unable to get result from controller")
 	}
+	return nil
 }
 
-func (client *Client) ls(result *connection.FileData, connectionHandler *connection.ConnectionHandler) {
+func (client *Client) ls(result *connection.FileData, connectionHandler *connection.ConnectionHandler) error {
 	fmt.Println(result.Data)
 	ackLS := &connection.FileData{}
 	ackLS.MessageType = connection.MessageType_ACK_LS
 	err := connectionHandler.Send(ackLS)
 	if err != nil {
 		log.Println("Error sending ack ls to controller")
+		return errors.New("error client unable to send ls ack")
 	}
+	return nil
 }
 
-func (client *Client) put(result *connection.FileData, connectionHandler *connection.ConnectionHandler) {
+func (client *Client) put(result *connection.FileData, connectionHandler *connection.ConnectionHandler) error {
 	chunkMetaMap, err := client.getChunkMeta()
 	if err != nil {
-		log.Fatalln("Error getting chunk data from file on client ", err)
+		log.Println("Error getting chunk data from file on client ", err)
+		return errors.New(fmt.Sprintf("error getting chunk data from file on client %s\n", err))
 	}
 	// The method below fills chunkMetaMap with the correct storage node info
 	err = client.sendChunkInfoController(connectionHandler, chunkMetaMap)
 	if err != nil {
-		log.Fatalln("Error sending chunk info from client to server ", err)
+		log.Println("Error sending chunk info from client to server ", err)
+		return errors.New(fmt.Sprintf("Error sending chunk info from client to server %s", err))
 	}
 
 	//TODO call function that sends chunks to the storage nodes defined in chunkMetaMap
 	// map with storage node and connection handler
 	// generate the chunks-data as byte arrays
 	// send the chunk data to corresponding node
-	checkSum := client.sendChunksToNodes(chunkMetaMap)
+	checkSum, err := client.sendChunksToNodes(chunkMetaMap)
+	if err != nil {
+		return err
+	}
 	err = client.sendCheckSumToController(checkSum, connectionHandler)
 	if err != nil {
-		log.Fatalln("Error sending checksum to controller ", err)
+		log.Println("Error sending checksum to controller ", err)
+		return errors.New(fmt.Sprintf("Error sending checksum to controller %s", err))
 	}
+	return nil
 }
 
 func (client *Client) sendCheckSumToController(checkSum []byte, handler *connection.ConnectionHandler) error {
@@ -167,7 +184,7 @@ func (client *Client) sendCheckSumToController(checkSum []byte, handler *connect
 	ack, err := handler.Receive()
 	if err != nil || ack.MessageType != connection.MessageType_ACK {
 		log.Println("Error receiving ack from controller for file checksum ", err)
-		return errors.New("Error sending checksum to controller")
+		return errors.New("error sending checksum to controller")
 	}
 	return nil
 }
@@ -220,7 +237,8 @@ func (client *Client) sendChunkInfoController(handler *connection.ConnectionHand
 	for _, protoChunk := range message.Chunk {
 		initialChunk, ok := chunkMap[protoChunk.Name]
 		if !ok {
-			log.Fatalln("Error getting chunk data from controller on client")
+			log.Println("Error getting chunk data from controller on client")
+			return errors.New("error getting chunk data from controller on client")
 		}
 		initialChunk.Nodes = protoChunk.Nodes
 	}
@@ -232,23 +250,24 @@ type BlockingConnection struct {
 	mu sync.Mutex
 }
 
-func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) []byte {
+func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) ([]byte, error) {
 
 	blockingHandlerMap := make(map[string]*BlockingConnection)
 
 	file, err := os.Open(client.localPath)
 	if err != nil {
 		log.Println("Cannot open target file")
-		return nil
+		return nil, err
 	}
-	hash := sha256.New()
+	checksum := sha256.New()
 	for chunkName := range chunkMetaMap {
 
 		chunkData, err:= getChunkData(chunkMetaMap, chunkName, file)
 		if err != nil {
 			fmt.Println("Error getting chunk data for chunk ", chunkName)
+			return nil, err
 		}
-		hash.Write(chunkData)
+		checksum.Write(chunkData)
 		//TODO do this bit as a go routine
 		node := chunkMetaMap[chunkName].Nodes[0]
 		blockingHandler := getConnectionHandler(node, blockingHandlerMap)
@@ -272,29 +291,33 @@ func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) []by
 		err = conHandler.Send(message)
 		if err != nil {
 			fmt.Println("Error sending chunk metadata to storage node")
+			return nil, err
 		}
 		log.Println("Client sent chunk metadata to storage node")
 		// wait for ack
 		result, err := conHandler.Receive()
 		if err != nil || result.MessageType != connection.MessageType_ACK_PUT {
-			log.Fatalln("Error receiving ack data for put metadata from storage node on the client")
+			log.Println("Error receiving ack data for put metadata from storage node on the client")
+			return nil, err
 		}
 		// send chunk
 		err = conHandler.WriteN(chunkData)
 		if err != nil {
 			fmt.Println("Error sending chunk payload to storage node")
+			return nil, err
 		}
 		log.Println("Client wrote the chunk data to node stream")
 		//wait for ack
 		result, err = conHandler.Receive()
 		if err != nil || result.MessageType != connection.MessageType_ACK_PUT {
-			log.Fatalln("Error receiving ack data for put payload from storage node on the client")
+			log.Println("Error receiving ack data for put payload from storage node on the client")
+			return nil, err
 		}
 
 		log.Println("sent chunk info to storage node ", chunkName)
 		blockingHandler.mu.Unlock()
 	}
-	return hash.Sum(nil)
+	return checksum.Sum(nil), nil
 }
 
 func getChunkData(chunkMetaMap map[string]*chunkMeta, chunkName string, file *os.File) ([]byte, error) {
@@ -327,7 +350,7 @@ func getConnectionHandler(node *connection.Node, handlerMap map[string]*Blocking
 }
 
 
-func (client *Client) get(result *connection.FileData, handler *connection.ConnectionHandler) {
+func (client *Client) get(result *connection.FileData, handler *connection.ConnectionHandler) error {
 	savedChecksum := result.Checksum
 	log.Println(len(savedChecksum))
 	chunks := result.Chunk
@@ -346,7 +369,8 @@ func (client *Client) get(result *connection.FileData, handler *connection.Conne
 	f := false
 	done = &f
 	checkSum := sha256.New()
-	go client.saveData(numChunks, downloadChan, saveLock, checkSum, done)
+	var saveError error = nil
+	go client.saveData(numChunks, downloadChan, saveLock, checkSum, done, &saveError)
 
 	for _, chunk := range chunks {
 		go getChunkFromStorage(chunk, blockingHandlerMap, nextChunkNum, saveLock, downloadChan)
@@ -355,21 +379,23 @@ func (client *Client) get(result *connection.FileData, handler *connection.Conne
 	saveLock.Cond.L.Lock()
 	for true {
 		if !*done {
-			fmt.Println("locking end lock done ", *done)
 			saveLock.Cond.Wait()
 		} else {
 			if reflect.DeepEqual(savedChecksum, checkSum) {
-				log.Fatalln("Error saving file, checksums do not match")
+				log.Println("Error saving file, checksums do not match")
+				return errors.New("error saving file, checksums do not match")
 			} else {
 				log.Println("File checksums match")
+				return nil
 			}
-			break
 		}
 	}
+	return nil
 }
 
 func getChunkFromStorage(chunk *connection.Chunk, handlerMap map[string]*BlockingConnection,
 	nextChunkNum *AtomicInt, saveLock *WaitNotify, downloadChan chan []byte) {
+	// TODO should not just get the first node, should check other nodes if this fails
 	blockingHandler := getConnectionHandler(chunk.Nodes[0], handlerMap)
 	blockingHandler.mu.Lock()
 	conn := blockingHandler.conHandler
@@ -430,23 +456,24 @@ func getBytesFromStorage(conn *connection.ConnectionHandler, chunk *connection.C
 	return byteData, nil
 }
 
-func (client *Client) saveData(numChunks int32, downloadChan chan []byte, saveLock *WaitNotify, hash hash.Hash, done *bool) {
+func (client *Client) saveData(numChunks int32, downloadChan chan []byte, saveLock *WaitNotify, hash hash.Hash, done *bool, e *error) {
 	file, err := os.OpenFile(client.localPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		log.Fatalln("Failed to open file on client for saving data ", err)
+		log.Println("Failed to open file on client for saving data ", err)
+		*e = err
 	}
 	for i := numChunks; i > 0; i-- {
 		data := <- downloadChan
 		write, err := file.Write(data)
 		hash.Write(data)
 		if err != nil || write != len(data) {
-			log.Fatalln("Error writing to save file ", err)
+			log.Println("Error writing to save file ", err)
+			*e = err
 		}
 		log.Printf("recevied data of size %d\n", len(data))
 		saveLock.Cond.Broadcast()
 	}
 	*done = true;
-	fmt.Println("done at the end of save ", *done)
 	saveLock.Cond.Broadcast()
 }
 

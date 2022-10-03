@@ -10,6 +10,7 @@ import (
 	"log"
 	"math/big"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -147,15 +148,22 @@ func (storageNode *StorageNode) uploadHandler(connectionHandler *connection.Conn
 	//save file
 	dirname := storageNode.savePath
 	err := os.Mkdir( dirname, 0700)
+	if err != nil {
+		log.Println("Directory might alreay exist ", err)
+	}
 	file, err := os.Create("./" + dirname+ "/" + path)
 	defer file.Close()
 	if err != nil {
 		log.Println("Error opening file ", path, err)
 		return
 	}
-	file.Write(data)
+	write, err := file.Write(data)
+	if err != nil || write < 1{
+		log.Println("Error saving data ", err)
+	} else {
+		log.Printf("chunk %s saved \n", path)
+	}
 
-	log.Printf("chunk %s saved \n", path)
 
 	//send back ack
 	response = &connection.FileData{}
@@ -244,7 +252,7 @@ func (storageNode *StorageNode) downloadHandler(handler *connection.ConnectionHa
 	message *connection.FileData, getChan <-chan *connection.FileData) {
 	sendMessage := &connection.FileData{}
 	log.Printf("Storage node %s received request to download %s", storageNode.id, message.Path)
-	data, err := file_io.ReadFile(message.Path)
+	data, err := file_io.ReadFile(filepath.Join(storageNode.savePath, message.Path))
 	if err != nil {
 		sendMessage.MessageType = connection.MessageType_ERROR
 		err := handler.Send(sendMessage)
