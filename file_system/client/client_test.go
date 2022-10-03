@@ -170,8 +170,9 @@ func TestClientUploadData(t *testing.T) {
 		name := "this_test_path_footxt_"
 		for i := 0; i<10 ; i++ {
 			newName := fmt.Sprintf("%s%d", name, i)
-			for j := 0; j < 4; j++ {
-				os.Remove("./sn" + string(j) + "/" + newName)
+			for j := 0; j < 5; j++ {
+				fullPath := fmt.Sprintf("./sn%d/%s", j, newName)
+				os.Remove(fullPath)
 				dirName := fmt.Sprintf("./sn%d", j)
 				os.Remove(dirName)
 			}
