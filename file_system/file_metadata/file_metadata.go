@@ -52,7 +52,7 @@ func (fileMetadata *FileMetadata) UploadChunks(path string, chunks map[string]*C
 	return nil
 }
 
-func chunkArrayToMap(chunks []*Chunk) map[string]*Chunk{
+func chunkArrayToMap(chunks []*Chunk) map[string]*Chunk {
 	res := make(map[string]*Chunk)
 	for _, c := range chunks {
 		res[c.Name] = c
@@ -79,7 +79,6 @@ func getNode(node *Node, path string, write bool) *Node {
 	return getNode(directoryNode, strings.TrimPrefix(path, "/"+directoryName), write)
 }
 
-
 func (fileMetadata *FileMetadata) Ls(path string) string {
 	directoryNode := getNode(fileMetadata.rootNode, path, false)
 	res := ""
@@ -91,7 +90,6 @@ func (fileMetadata *FileMetadata) Ls(path string) string {
 	}
 	return strings.TrimSuffix(res, " ")
 }
-
 
 func (fileMetadata *FileMetadata) Download(path string) (map[string]*Chunk, []byte, error) {
 	pathSplit := strings.Split(path, "/")
@@ -157,7 +155,7 @@ func (fileMetadata *FileMetadata) UpdateChecksum(path string, sum []byte) error 
 	return nil
 }
 
-func (fileMetadata *FileMetadata) HeartbeatHandler(path string, chunk string) bool{
+func (fileMetadata *FileMetadata) HeartbeatHandler(path string, chunk string) bool {
 	pathSplit := strings.Split(path, "/")
 	fileName := pathSplit[len(pathSplit)-1]
 	directoryPath := strings.Replace(path, fileName, "", -1)
@@ -201,7 +199,7 @@ type Chunk struct {
 	Checksum     int32
 	Status       Status
 	StorageNodes []string //TODO this needs to be map for better pending state
-	Num 		 int32
+	Num          int32
 }
 
 type Status int32

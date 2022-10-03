@@ -51,13 +51,13 @@ func TestBasicClient(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	go func(id string) {
-		storageNode := storage.NewStorageNode(testId, storageSize, storageHost, storagePort0, testConfig, savePathStorageNode0 )
+		storageNode := storage.NewStorageNode(testId, storageSize, storageHost, storagePort0, testConfig, savePathStorageNode0)
 		storageNode.Start()
 		time.Sleep(time.Second * 1)
 	}(testId)
 
 	go func(id string) {
-		storageNode := storage.NewStorageNode(testId2, storageSize, storageHost, storagePort1, testConfig, savePathStorageNode1 )
+		storageNode := storage.NewStorageNode(testId2, storageSize, storageHost, storagePort1, testConfig, savePathStorageNode1)
 		storageNode.Start()
 	}(testId2)
 
@@ -78,7 +78,7 @@ func TestBasicClient(t *testing.T) {
 func TestClientUploadData(t *testing.T) {
 	defer func() {
 		name := "this_test_path_footxt_"
-		for i := 0; i<10 ; i++ {
+		for i := 0; i < 10; i++ {
 			newName := fmt.Sprintf("%s%d", name, i)
 			for j := 0; j < 5; j++ {
 				fullPath := fmt.Sprintf("./sn%d/%s", j, newName)
@@ -164,7 +164,7 @@ func TestClientUploadData(t *testing.T) {
 
 	// TODO complete test to validate file is saved
 	if clientPutError != nil {
-		t.Fatalf("client test failed %s ",  clientPutError)
+		t.Fatalf("client test failed %s ", clientPutError)
 	}
 
 }
@@ -179,7 +179,7 @@ func TestClientDownloadSimple(t *testing.T) {
 	}(savePath)
 	defer func() {
 		name := "this_test_path_footxt_"
-		for i := 0; i<10 ; i++ {
+		for i := 0; i < 10; i++ {
 			newName := fmt.Sprintf("%s%d", name, i)
 			for j := 0; j < 5; j++ {
 				fullPath := fmt.Sprintf("./sn%d/%s", j, newName)
@@ -212,7 +212,6 @@ func TestClientDownloadSimple(t *testing.T) {
 
 	remotePath := "/this/test/path/foo.txt"
 	localPath := "testdata/testFile.txt"
-
 
 	testStorageNode0 := "testStorageNode0"
 	testStorageNode1 := "testStorageNode1"

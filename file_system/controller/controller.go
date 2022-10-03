@@ -122,9 +122,9 @@ func (controller *Controller) heartbeatHandler(connectionHandler *connection.Con
 	log.Println("Received heart beat from ", message.SenderId)
 	controller.memberTable.RecordBeat(message.SenderId)
 	//TODO update file metadata with info that is passed in heartbeat
-		//^^ returns a boolean
-		//depending on boolean save file metadata
-		// we still update the chunk info so it might be best to save it regardless
+	//^^ returns a boolean
+	//depending on boolean save file metadata
+	// we still update the chunk info so it might be best to save it regardless
 	if message.MessageType == connection.MessageType_HEARTBEAT_CHUNK {
 		// call some function here
 		controller.fileMetadata.HeartbeatHandler(message.Path, message.Data)

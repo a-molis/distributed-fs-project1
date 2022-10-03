@@ -17,14 +17,13 @@ import (
 type StorageNode struct {
 	id                string
 	size              big.Int
-	storageNodeHost string
-	storageNodePort int32
-	config *config.Config
+	storageNodeHost   string
+	storageNodePort   int32
+	config            *config.Config
 	connectionHandler *connection.ConnectionHandler
 	running           bool
-	server 			*connection.Server
-	savePath string
-
+	server            *connection.Server
+	savePath          string
 }
 
 func NewStorageNode(id string, size int64, host string, port int32, config *config.Config, savePath string) *StorageNode {
@@ -147,23 +146,22 @@ func (storageNode *StorageNode) uploadHandler(connectionHandler *connection.Conn
 
 	//save file
 	dirname := storageNode.savePath
-	err := os.Mkdir( dirname, 0700)
+	err := os.Mkdir(dirname, 0700)
 	if err != nil {
 		log.Println("Directory might alreay exist ", err)
 	}
-	file, err := os.Create("./" + dirname+ "/" + path)
+	file, err := os.Create("./" + dirname + "/" + path)
 	defer file.Close()
 	if err != nil {
 		log.Println("Error opening file ", path, err)
 		return
 	}
 	write, err := file.Write(data)
-	if err != nil || write < 1{
+	if err != nil || write < 1 {
 		log.Println("Error saving data ", err)
 	} else {
 		log.Printf("chunk %s saved \n", path)
 	}
-
 
 	//send back ack
 	response = &connection.FileData{}
@@ -238,7 +236,7 @@ func (storageNode *StorageNode) replicationHandler(chunkData []byte, message *co
 	log.Println("successfully sent replication message and data ")
 }
 
-func peelOffNode(nodes []*connection.Node, id string) []*connection.Node{
+func peelOffNode(nodes []*connection.Node, id string) []*connection.Node {
 	for i, n := range nodes {
 		if n.Id == id {
 			nodes = append(nodes[:i], nodes[i+1:]...)
@@ -267,7 +265,7 @@ func (storageNode *StorageNode) downloadHandler(handler *connection.ConnectionHa
 	if err != nil {
 		log.Printf("Error sending initial data size to client on storage node %s", storageNode.id)
 	}
-	ack := <- getChan
+	ack := <-getChan
 	if ack.MessageType != connection.MessageType_ACK_GET {
 		log.Printf("Error ack for sending initial data size to client on storage node %s", storageNode.id)
 	}
@@ -276,7 +274,7 @@ func (storageNode *StorageNode) downloadHandler(handler *connection.ConnectionHa
 	if err != nil {
 		log.Printf("Error writeN sending data to client download on storage node %s", storageNode.id)
 	}
-	lastAck := <- getChan
+	lastAck := <-getChan
 	if lastAck.MessageType != connection.MessageType_ACK_GET {
 		log.Printf("Error ack for downlaod data client on storage node %s", storageNode.id)
 	}

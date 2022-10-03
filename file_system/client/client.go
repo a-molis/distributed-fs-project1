@@ -29,10 +29,10 @@ type Client struct {
 }
 
 type chunkMeta struct {
-	name string
-	size int64
+	name  string
+	size  int64
 	Nodes []*connection.Node
-	num int32
+	num   int32
 }
 
 type Node struct {
@@ -247,7 +247,7 @@ func (client *Client) sendChunkInfoController(handler *connection.ConnectionHand
 
 type BlockingConnection struct {
 	conHandler *connection.ConnectionHandler
-	mu sync.Mutex
+	mu         sync.Mutex
 }
 
 func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) ([]byte, error) {
@@ -262,7 +262,7 @@ func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) ([]b
 	checksum := sha256.New()
 	for chunkName := range chunkMetaMap {
 
-		chunkData, err:= getChunkData(chunkMetaMap, chunkName, file)
+		chunkData, err := getChunkData(chunkMetaMap, chunkName, file)
 		if err != nil {
 			fmt.Println("Error getting chunk data for chunk ", chunkName)
 			return nil, err
@@ -348,7 +348,6 @@ func getConnectionHandler(node *connection.Node, handlerMap map[string]*Blocking
 
 	return blockingConnection
 }
-
 
 func (client *Client) get(result *connection.FileData, handler *connection.ConnectionHandler) error {
 	savedChecksum := result.Checksum
@@ -463,7 +462,7 @@ func (client *Client) saveData(numChunks int32, downloadChan chan []byte, saveLo
 		*e = err
 	}
 	for i := numChunks; i > 0; i-- {
-		data := <- downloadChan
+		data := <-downloadChan
 		write, err := file.Write(data)
 		hash.Write(data)
 		if err != nil || write != len(data) {
@@ -473,7 +472,7 @@ func (client *Client) saveData(numChunks int32, downloadChan chan []byte, saveLo
 		log.Printf("recevied data of size %d\n", len(data))
 		saveLock.Cond.Broadcast()
 	}
-	*done = true;
+	*done = true
 	saveLock.Cond.Broadcast()
 }
 

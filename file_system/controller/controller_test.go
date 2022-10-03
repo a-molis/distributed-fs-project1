@@ -118,7 +118,7 @@ func TestHeartBeat(t *testing.T) {
 
 	time.Sleep(time.Second * 1)
 
-	go func( id string) {
+	go func(id string) {
 		storageNode := storage.NewStorageNode(id, size, "localHost", storagePort0, testConfig, savePathStorageNode0)
 		storageNode.Start()
 	}(testId)

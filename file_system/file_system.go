@@ -19,8 +19,8 @@ func main() {
 
 	// storage size is in MB, chunk size in config is in bytes
 	storageSize := flag.Int64("storage_size", -1, "The storage size of the storage node")
-	localPath :=  flag.String("local_path", "", "The path of the local file on disk")
-	remotePath :=  flag.String("remote_path", "", "The path of the remote file on the dfs")
+	localPath := flag.String("local_path", "", "The path of the local file on disk")
+	remotePath := flag.String("remote_path", "", "The path of the remote file on the dfs")
 	flag.Parse()
 
 	configFile, err := config.ConfigFromPath("./config.json")

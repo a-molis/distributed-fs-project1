@@ -58,7 +58,7 @@ func TestBasicClient(t *testing.T) {
 
 	receivedPath := ""
 
-	var port int = 12026
+	var port = 12026
 
 	host := "localhost"
 	server := NewServer(host, port)
