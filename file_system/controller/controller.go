@@ -189,12 +189,14 @@ func (controller *Controller) uploadHandler(connectionHandler *connection.Connec
 }
 
 func (controller *Controller) Ls(handler *connection.ConnectionHandler, connectionChan <-chan *connection.FileData, message *connection.FileData) {
+	log.Printf("LS for path %s\n", message.Path)
 	sendMessage := &connection.FileData{}
 	sendMessage.MessageType = connection.MessageType_LS
+	data, err := controller.fileMetadata.Ls(message.Path)
 
 	// TODO update to have ls logic to get files in directory path
-	sendMessage.Data = "No files found"
-	err := handler.Send(sendMessage)
+	sendMessage.Data = data
+	err = handler.Send(sendMessage)
 	if err != nil {
 		log.Println("Error sending ls data to client ", err)
 	}

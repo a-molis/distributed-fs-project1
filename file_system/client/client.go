@@ -65,28 +65,29 @@ var (
 	}
 )
 
-func (client *Client) Run() error {
+func (client *Client) Run() (*string, error) {
 	messageType, ok := commandMap[strings.ToLower(client.command)]
 	if !ok {
 		log.Println("Command not recognized ", client.command)
-		return errors.New("command not recognized")
+		return nil, errors.New("command not recognized")
 	}
 	message := &connection.FileData{}
 	message.MessageType = messageType
 
 	if messageType == connection.MessageType_RM ||
 		messageType == connection.MessageType_GET ||
-		messageType == connection.MessageType_PUT {
+		messageType == connection.MessageType_PUT ||
+		messageType == connection.MessageType_LS {
 		if len(client.args) < 1 {
 			log.Println("Missing arguments")
-			return errors.New("missing arguments")
+			return nil, errors.New("missing arguments")
 		}
 		client.remotePath = client.args[0]
 		message.Path = client.remotePath
 		if messageType == connection.MessageType_GET || messageType == connection.MessageType_PUT {
 			if len(client.args) < 2 {
 				log.Println("Missing local path for get or put")
-				return errors.New("missing local path for get or put")
+				return nil, errors.New("missing local path for get or put")
 			}
 			client.localPath = client.args[1]
 		}
@@ -94,7 +95,7 @@ func (client *Client) Run() error {
 	connectionHandler, err := connection.NewClient(client.controllerHost, client.controllerPort)
 	if err != nil {
 		log.Printf("Error client unable to connect to Controller %s\n", err)
-		return errors.New(fmt.Sprintf("Error client unable to connect to Controller %s", err))
+		return nil, errors.New(fmt.Sprintf("Error client unable to connect to Controller %s", err))
 	}
 	log.Printf("Client connected to controller")
 	client.connectionHandler = connectionHandler
@@ -103,48 +104,48 @@ func (client *Client) Run() error {
 	return client.sendToController(err, message, connectionHandler)
 }
 
-func (client *Client) sendToController(err error, message *connection.FileData, connectionHandler *connection.ConnectionHandler) error {
+func (client *Client) sendToController(err error, message *connection.FileData, connectionHandler *connection.ConnectionHandler) (*string, error) {
 	// TODO refactor to immediately enter method for specific messageType
 	err = client.connectionHandler.Send(message)
 	if err != nil {
 		log.Println("Error sending data to controller")
-		return errors.New("error sending data to controller")
+		return nil, errors.New("error sending data to controller")
 	}
 	log.Printf("Client sent command to server")
 	result, err := connectionHandler.Receive()
 	if err != nil {
 		log.Println("Error receiving data from controller on the client")
-		return errors.New("error receiving data from controller on the client")
+		return nil, errors.New("error receiving data from controller on the client")
 	}
 	if result.MessageType == connection.MessageType_LS {
 		log.Printf("Client received ls message back from controller")
 		return client.ls(result, connectionHandler)
 	} else if result.MessageType == connection.MessageType_PUT {
 		log.Println("Client received put message")
-		return client.put(result, connectionHandler)
+		return nil, client.put(result, connectionHandler)
 	} else if result.MessageType == connection.MessageType_GET {
-		return client.get(result, connectionHandler)
+		return nil, client.get(result, connectionHandler)
 	} else if result.MessageType == connection.MessageType_RM {
-		return client.rm(result, connectionHandler)
+		return nil, client.rm(result, connectionHandler)
 	} else if result.MessageType == connection.MessageType_ERROR {
 		log.Println("Error: ", result.Data)
-		return errors.New(fmt.Sprintf("Error: %s", result.Data))
+		return nil, errors.New(fmt.Sprintf("Error: %s", result.Data))
 	} else {
 		log.Println("Error client unable to get result from controller")
-		return errors.New("error client unable to get result from controller")
+		return nil, errors.New("error client unable to get result from controller")
 	}
 }
 
-func (client *Client) ls(result *connection.FileData, connectionHandler *connection.ConnectionHandler) error {
+func (client *Client) ls(result *connection.FileData, connectionHandler *connection.ConnectionHandler) (*string, error) {
 	fmt.Println(result.Data)
 	ackLS := &connection.FileData{}
 	ackLS.MessageType = connection.MessageType_ACK_LS
 	err := connectionHandler.Send(ackLS)
 	if err != nil {
 		log.Println("Error sending ack ls to controller")
-		return errors.New("error client unable to send ls ack")
+		return nil, errors.New("error client unable to send ls ack")
 	}
-	return nil
+	return &result.Data, nil
 }
 
 func (client *Client) put(result *connection.FileData, connectionHandler *connection.ConnectionHandler) error {

@@ -4,6 +4,7 @@ import (
 	"dfs/config"
 	"dfs/storage"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -208,12 +209,12 @@ func TestSaveFileMetadata(t *testing.T) {
 		controller = NewController("testId", testConfig)
 		go controller.Start()
 		controller.LoadFileMetadata()
-		*file = controller.fileMetadata.Ls("/foo/something/")
+		*file, _ = controller.fileMetadata.Ls("/foo/something/")
 	}(&file)
 
 	time.Sleep(time.Second * 6)
 
-	if file != "file.txt" {
+	if !strings.Contains(file, "file.txt") {
 		t.Fatalf("loaded file metadata is incorrect, %s", file)
 	}
 

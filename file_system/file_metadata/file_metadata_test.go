@@ -2,6 +2,7 @@ package file_metadata
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -20,21 +21,21 @@ func TestUpload(t *testing.T) {
 		fmt.Println("error uploading")
 	}
 
-	s1 := fmdt.Ls("/")
+	s1, _ := fmdt.Ls("/")
 	fmt.Println(s1)
-	if s1 != "foo" {
+	if !strings.Contains(s1, "foo") {
 		t.Fatalf("incorrect ls result / %s", s1)
 	}
 
-	s2 := fmdt.Ls("/foo/")
+	s2, _ := fmdt.Ls("/foo/")
 	fmt.Println(s2)
-	if s2 != "path" {
+	if !strings.Contains(s2, "path") {
 		t.Fatalf("incorrect ls result foo %s", s2)
 	}
 
-	s3 := fmdt.Ls("/foo/path/somedir/someotherdir/")
+	s3, _ := fmdt.Ls("/foo/path/somedir/someotherdir/")
 	fmt.Println(s3)
-	if s3 != "file2.txt" {
+	if !strings.Contains(s3, "file2.txt") {
 		t.Fatalf("incorrect ls result somedir %s", s3)
 	}
 }

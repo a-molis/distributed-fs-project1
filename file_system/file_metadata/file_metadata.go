@@ -3,6 +3,7 @@ package file_metadata
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -65,6 +66,9 @@ func getNode(node *Node, path string, write bool) *Node {
 		return node
 	}
 	pathSplit := strings.Split(path, "/")
+	if len(pathSplit) == 1 {
+		return node
+	}
 	directoryName := pathSplit[1]
 	directoryNode, ok := node.Dirs[directoryName]
 	if !ok {
@@ -79,16 +83,31 @@ func getNode(node *Node, path string, write bool) *Node {
 	return getNode(directoryNode, strings.TrimPrefix(path, "/"+directoryName), write)
 }
 
-func (fileMetadata *FileMetadata) Ls(path string) string {
+func (fileMetadata *FileMetadata) Ls(path string) (string, error) {
 	directoryNode := getNode(fileMetadata.rootNode, path, false)
+	if directoryNode == nil {
+		pathSplit := strings.Split(path, "/")
+		fileName := pathSplit[len(pathSplit)-1]
+		directoryPath := strings.Replace(path, fileName, "", -1)
+		directoryNode = getNode(fileMetadata.rootNode, directoryPath, false)
+		if directoryNode == nil {
+			return "", errors.New(fmt.Sprintf("%s not found", path))
+		}
+		_, ok := directoryNode.Files[fileName]
+		if ok {
+			return path + " (file)", nil
+		} else {
+			return fmt.Sprintf("ls: %s: No such file or directory", path), nil
+		}
+	}
 	res := ""
 	for dir := range directoryNode.Dirs {
-		res = res + dir + " "
+		res = res + dir + " (dir) \n"
 	}
 	for file := range directoryNode.Files {
-		res = res + file + " "
+		res = res + file + " (file) \n"
 	}
-	return strings.TrimSuffix(res, " ")
+	return strings.TrimSuffix(res, "\n"), nil
 }
 
 func (fileMetadata *FileMetadata) Download(path string) (map[string]*Chunk, []byte, error) {
