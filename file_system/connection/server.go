@@ -10,16 +10,15 @@ type Server struct {
 	listener net.Listener
 }
 
-func NewServer(host string, port int) *Server {
+func NewServer(host string, port int) (*Server, error) {
 	log.Println(host)
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
-		log.Fatalf("Unable to create server on port %d", port)
+		log.Printf("Unable to create server on port %d", port)
+		return nil, err
 	}
 	log.Printf("listening at port %d", port)
-	return &Server{
-		listener: listener,
-	}
+	return &Server{listener: listener}, nil
 }
 
 func (server *Server) NextConnectionHandler() (*ConnectionHandler, error) {
@@ -29,4 +28,15 @@ func (server *Server) NextConnectionHandler() (*ConnectionHandler, error) {
 		return nil, err
 	}
 	return NewConnectionHandler(conn), nil
+}
+
+func (server *Server) Shutdown() error {
+	if server != nil && server.listener != nil {
+		err := server.listener.Close()
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	return nil
 }

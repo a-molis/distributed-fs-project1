@@ -5,7 +5,7 @@ import (
 	. "dfs/config"
 	"dfs/connection"
 	"dfs/file_metadata"
-	file_io "dfs/files_io"
+	fileio "dfs/files_io"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -29,19 +29,30 @@ func NewController(id string, config *Config) *Controller {
 	controller.id = id
 	controller.port = config.ControllerPort
 	controller.memberTable = NewMemberTable()
-	controller.running = true
 	controller.host = config.ControllerHost
-	controller.fileMetadata = file_metadata.NewFileMetaData()
 	controller.config = config
+	controller.fileMetadata = file_metadata.NewFileMetaData()
+	loadErr := controller.LoadFileMetadata()
+	if loadErr != nil {
+		log.Println("Unable to load file metadata, stopping new controller")
+	}
 	return controller
 }
 
 func (controller *Controller) Start() {
-	controller.server = connection.NewServer(controller.host, controller.port)
+	controller.running = true
+	log.Println("Starting controller")
+	server, err := connection.NewServer(controller.host, controller.port)
+	if err != nil {
+		log.Fatalln("Unable to create new server on controller")
+	}
+	controller.server = server
 	controller.listen()
+	log.Println("Controller shut down")
 }
 
 func (controller *Controller) listen() {
+	log.Println("Starting controller listener")
 	for controller.running {
 		connectionHandler, err := controller.server.NextConnectionHandler()
 		if err != nil {
@@ -49,6 +60,7 @@ func (controller *Controller) listen() {
 		}
 		go controller.handleConnection(connectionHandler)
 	}
+	log.Println("Shutting down controller listen")
 }
 
 func (controller *Controller) handleConnection(connectionHandler *connection.ConnectionHandler) {
@@ -105,12 +117,18 @@ func (controller *Controller) updateCheckSum(handler *connection.ConnectionHandl
 
 func (controller *Controller) shutdown() {
 	controller.running = false
+	controller.memberTable.Shutdown()
+	log.Println("Shutting down controller listening server")
+	err := controller.server.Shutdown()
+	if err != nil {
+		log.Println("Error shutting down controller listening server")
+	}
 }
 
 func (controller *Controller) registerHandler(connectionHandler *connection.ConnectionHandler, message *connection.FileData) {
 	log.Println("Received registration message from ", message.SenderId)
 	size := new(big.Int).SetBytes(message.Size)
-	err := controller.memberTable.Register(message.SenderId, size, message.Node.Hostname, message.Node.Port)
+	err := controller.memberTable.Register(message.SenderId, size, message.Node.Hostname, message.Node.Port, connectionHandler)
 	if err == nil {
 		ack := &connection.FileData{}
 		ack.MessageType = connection.MessageType_ACK
@@ -121,7 +139,7 @@ func (controller *Controller) registerHandler(connectionHandler *connection.Conn
 }
 
 func (controller *Controller) heartbeatHandler(connectionHandler *connection.ConnectionHandler, message *connection.FileData) {
-	log.Println("Received heart beat from ", message.SenderId)
+	log.Printf("Received heart beat from %s on %s\n", message.SenderId, controller.id)
 	controller.memberTable.RecordBeat(message.SenderId)
 	//TODO update file metadata with info that is passed in heartbeat
 	//^^ returns a boolean
@@ -161,13 +179,13 @@ func (controller *Controller) uploadHandler(connectionHandler *connection.Connec
 	exists := controller.fileMetadata.PathExists(filepath)
 
 	if exists {
-		err := file_io.SendError(connectionHandler, "File already exists")
+		err := fileio.SendError(connectionHandler, "File already exists")
 		if err != nil {
 			log.Println("Unable to send error to client")
 		}
 		return
 	}
-	err := file_io.SendMessage(connectionHandler, connection.MessageType_PUT)
+	err := fileio.SendMessage(connectionHandler, connection.MessageType_PUT)
 	chunkData := <-connectionChan
 	chunks := ProtoToChunk(chunkData.GetChunk())
 
@@ -213,7 +231,7 @@ func (controller *Controller) SaveFileMetadata() {
 		log.Println("Error converting filemetadata to bytes")
 		return
 	}
-	file, err := os.Create("./fmdt")
+	file, err := os.Create(controller.config.ControllerPath)
 	defer file.Close()
 	if err != nil {
 		log.Println("Error opening file fmdt")
@@ -233,14 +251,34 @@ func (controller *Controller) SaveFileMetadata() {
 }
 
 func (controller *Controller) LoadFileMetadata() error {
-	file, err := os.Open("./fmdt")
+	_, err := os.Stat(controller.config.ControllerPath)
+	if err != nil {
+		log.Println("Error closing file for meta data load")
+		return nil
+	}
+
+	file, err := os.Open(controller.config.ControllerPath)
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			log.Println("Error closing file for meta data load")
+		}
+	}(file)
+	//if os.IsNotExist(err) {
+	//	log.Println("No file metadata backup found on disk skipping...")
+	//	return nil
+	//}
 	if err != nil {
 		return err
 	}
-	defer file.Close()
 	bytes, err := ioutil.ReadAll(file)
-	if err == nil {
-		controller.fileMetadata.LoadBytes(bytes)
+	if err != nil {
+		log.Println("Error reading in metadata file")
+		return err
+	}
+	err = controller.fileMetadata.LoadBytes(bytes)
+	if err != nil {
+		return err
 	}
 	return err
 }

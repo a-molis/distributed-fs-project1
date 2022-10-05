@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"dfs/connection"
 	"errors"
 	"log"
 	"math/big"
@@ -11,6 +12,7 @@ import (
 type MemberTable struct {
 	members map[string]Member
 	lock    sync.RWMutex
+	running bool
 }
 
 type Member struct {
@@ -19,6 +21,7 @@ type Member struct {
 	availableSize *big.Int
 	port          int32
 	host          string
+	handler       *connection.ConnectionHandler
 }
 
 func NewMemberTable() *MemberTable {
@@ -26,11 +29,12 @@ func NewMemberTable() *MemberTable {
 	members := make(map[string]Member)
 	memberTable.members = members
 	memberTable.lock = sync.RWMutex{}
+	memberTable.running = true
 	go memberTable.failureDetection()
 	return memberTable
 }
 
-func (memberTable *MemberTable) Register(id string, size *big.Int, host string, port int32) error {
+func (memberTable *MemberTable) Register(id string, size *big.Int, host string, port int32, handler *connection.ConnectionHandler) error {
 	memberTable.lock.Lock()
 	defer memberTable.lock.Unlock()
 	storageNode := Member{}
@@ -38,6 +42,7 @@ func (memberTable *MemberTable) Register(id string, size *big.Int, host string, 
 	storageNode.availableSize = size
 	storageNode.port = port
 	storageNode.host = host
+	storageNode.handler = handler
 	if memberTable.members[id].status {
 		log.Printf("Member with id %s already exists", id)
 		return errors.New("storage node already registered")
@@ -70,7 +75,7 @@ func (memberTable *MemberTable) RecordBeat(id string) {
 func (memberTable *MemberTable) failureDetection() {
 	sleepTimer := time.Second * 5
 	threshold := time.Second * 10
-	for {
+	for memberTable.running {
 		for member := range memberTable.members {
 			memberTable.lock.Lock()
 			duration := time.Now().Sub(memberTable.members[member].lastBeat)
@@ -83,5 +88,21 @@ func (memberTable *MemberTable) failureDetection() {
 			memberTable.lock.Unlock()
 		}
 		time.Sleep(sleepTimer)
+	}
+}
+
+func (memberTable *MemberTable) Shutdown() {
+	log.Println("Shutting down member table")
+	memberTable.running = false
+	memberTable.lock.Lock()
+	defer memberTable.lock.Unlock()
+	for member := range memberTable.members {
+		m := memberTable.members[member]
+		if m.handler != nil {
+			err := m.handler.Close()
+			if err != nil {
+				log.Printf("Failed to close socket for member %s on port %d \n", m.host, m.port)
+			}
+		}
 	}
 }

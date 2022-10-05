@@ -107,6 +107,17 @@ func TestClientUploadData(t *testing.T) {
 		t.Errorf("Unable to open config")
 		return
 	}
+	err = os.Remove(testConfig.ControllerPath)
+	if err != nil {
+		log.Println("Unable to remove controller backup ", err)
+	}
+
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			log.Println("Unable to remove controller backup")
+		}
+	}(testConfig.ControllerPath)
 	testConfig.ChunkSize = chunkSize
 	testConfig.ControllerHost = controllerHost
 	testConfig.ControllerPort = controllerPort
@@ -232,6 +243,19 @@ func TestClientDownloadSimple(t *testing.T) {
 		t.Errorf("Unable to open config")
 		return
 	}
+
+	err = os.Remove(testConfig.ControllerPath)
+	if err != nil {
+		log.Println("Unable to remove controller backup ", err)
+	}
+
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			log.Println("Unable to remove controller backup")
+		}
+	}(testConfig.ControllerPath)
+
 	testConfig.ChunkSize = chunkSize
 	testConfig.ControllerHost = controllerHost
 	testConfig.ControllerPort = controllerPort
@@ -342,6 +366,17 @@ func TestClientRmSimple(t *testing.T) {
 		t.Errorf("Unable to open config")
 		return
 	}
+	err = os.Remove(testConfig.ControllerPath)
+	if err != nil {
+		log.Println("Unable to remove controller backup ", err)
+	}
+
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			log.Println("Unable to remove controller backup")
+		}
+	}(testConfig.ControllerPath)
 	testConfig.ChunkSize = chunkSize
 	testConfig.ControllerHost = controllerHost
 	testConfig.ControllerPort = controllerPort
@@ -470,11 +505,11 @@ func TestClientLs(t *testing.T) {
 
 	controllerHost := "localhost"
 	storageHost := "localhost"
-	controllerPort := 12074
-	var storagePort0 int32 = 12075
-	var storagePort1 int32 = 12076
+	controllerPort := 12082
+	var storagePort0 int32 = 12081
+	var storagePort1 int32 = 12080
 	var storagePort2 int32 = 12077
-	var storagePort3 int32 = 12078
+	var storagePort3 int32 = 12079
 
 	var size int64 = 1000000
 	var chunkSize int64 = 5000000
@@ -484,6 +519,19 @@ func TestClientLs(t *testing.T) {
 		t.Errorf("Unable to open config")
 		return
 	}
+
+	err = os.Remove(testConfig.ControllerPath)
+	if err != nil {
+		log.Println("Unable to remove controller backup ", err)
+	}
+
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Error("Unable to remove controller backup")
+		}
+	}(testConfig.ControllerPath)
+
 	testConfig.ChunkSize = chunkSize
 	testConfig.ControllerHost = controllerHost
 	testConfig.ControllerPort = controllerPort
@@ -607,6 +655,19 @@ func TestClientLsFilePath(t *testing.T) {
 		t.Errorf("Unable to open config")
 		return
 	}
+
+	err = os.Remove(testConfig.ControllerPath)
+	if err != nil {
+		log.Println("Unable to remove controller backup ", err)
+	}
+
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			log.Println("Unable to remove controller backup")
+		}
+	}(testConfig.ControllerPath)
+
 	testConfig.ChunkSize = chunkSize
 	testConfig.ControllerHost = controllerHost
 	testConfig.ControllerPort = controllerPort

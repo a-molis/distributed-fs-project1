@@ -15,7 +15,10 @@ func TestBasicServer(t *testing.T) {
 	receivedPath := ""
 	port := 12025
 	host := "localhost"
-	server := NewServer(host, port)
+	server, err := NewServer(host, port)
+	if err != nil {
+		log.Fatalln("Unable to establish server connection")
+	}
 
 	//bit for the client
 	go func(path string) {
@@ -61,7 +64,10 @@ func TestBasicClient(t *testing.T) {
 	var port = 12026
 
 	host := "localhost"
-	server := NewServer(host, port)
+	server, err := NewServer(host, port)
+	if err != nil {
+		log.Fatalln("Unable to establish server connection")
+	}
 
 	//bit for the client
 	go func(path string) {

@@ -43,19 +43,32 @@ func NewStorageNode(id string, size int64, host string, port int32, config *conf
 }
 
 func (storageNode *StorageNode) Start() {
+	err := storageNode.createControllerConn()
+	if err != nil {
+		log.Println("Unable to connect to controller from storage node ", storageNode.id)
+		return
+	}
+
+	storageNode.running = true
+	go storageNode.heartbeat()
+	server, err := connection.NewServer(storageNode.storageNodeHost, int(storageNode.storageNodePort))
+	if err != nil {
+		log.Fatalf("Unable to create listener on storage node %s", storageNode.id)
+	}
+	storageNode.server = server
+	go storageNode.listen()
+}
+
+func (storageNode *StorageNode) createControllerConn() error {
 	connectionHandler, err := connection.NewClient(storageNode.config.ControllerHost, storageNode.config.ControllerPort)
 	if err != nil {
 		log.Printf("Error while startig the storageNode %s", err)
-		return
+		return nil
 	}
 	storageNode.connectionHandler = connectionHandler
 
 	storageNode.register()
-
-	storageNode.running = true
-	go storageNode.heartbeat()
-	storageNode.server = connection.NewServer(storageNode.storageNodeHost, int(storageNode.storageNodePort))
-	go storageNode.listen()
+	return err
 }
 
 func (storageNode *StorageNode) Shutdown() {
@@ -89,7 +102,10 @@ func (storageNode *StorageNode) heartbeat() {
 	message.SenderId = storageNode.id
 	message.Size = storageNode.size.Bytes() //TODO this information should be sent in registration instead
 	for storageNode.running {
-		storageNode.connectionHandler.Send(message)
+		err := storageNode.connectionHandler.Send(message)
+		if err != nil {
+			storageNode.reconnect()
+		}
 		time.Sleep(heartBeatRate)
 	}
 }
@@ -278,4 +294,20 @@ func (storageNode *StorageNode) downloadHandler(handler *connection.ConnectionHa
 	if lastAck.MessageType != connection.MessageType_ACK_GET {
 		log.Printf("Error ack for downlaod data client on storage node %s", storageNode.id)
 	}
+}
+
+func (storageNode *StorageNode) reconnect() {
+	log.Println("Storage node trying to reconnect")
+	connected := false
+	for !connected {
+		err := storageNode.createControllerConn()
+		if err != nil {
+			log.Println("Unable to connect to controller from storage node ", storageNode.id)
+		} else {
+			log.Println("Storage node reconnected to controller ", storageNode.id)
+			connected = true
+		}
+	}
+	time.Sleep(time.Second * 1)
+
 }

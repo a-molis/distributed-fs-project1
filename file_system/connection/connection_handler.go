@@ -33,6 +33,7 @@ func (m *ConnectionHandler) ReadN(buf []byte) error {
 
 func (m *ConnectionHandler) WriteN(buf []byte) error {
 	bytesWritten := uint64(0)
+
 	for bytesWritten < uint64(len(buf)) {
 		n, err := m.conn.Write(buf[bytesWritten:])
 		if err != nil {
@@ -51,9 +52,14 @@ func (m *ConnectionHandler) Send(fileData *FileData) error {
 
 	prefix := make([]byte, 8)
 	binary.LittleEndian.PutUint64(prefix, uint64(len(serialized)))
-	m.WriteN(prefix)
-	m.WriteN(serialized)
-
+	err = m.WriteN(prefix)
+	if err != nil {
+		return err
+	}
+	err = m.WriteN(serialized)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -70,6 +76,6 @@ func (m *ConnectionHandler) Receive() (*FileData, error) {
 	return fileData, err
 }
 
-func (m *ConnectionHandler) Close() {
-	m.conn.Close()
+func (m *ConnectionHandler) Close() error {
+	return m.conn.Close()
 }

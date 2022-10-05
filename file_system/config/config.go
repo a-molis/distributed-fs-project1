@@ -11,6 +11,7 @@ type Config struct {
 	NumReplicas    int    `json:"num_replicas"`
 	ControllerHost string `json:"controller_host"`
 	ControllerPort int    `json:"controller_port"`
+	ControllerPath string `json:"controller_backup"`
 }
 
 func ConfigFromPath(path string) (*Config, error) {

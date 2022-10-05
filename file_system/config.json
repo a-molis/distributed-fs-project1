@@ -2,6 +2,6 @@
   "chunk_size" : 64000000,
   "num_replicas" : 3,
   "controller_host": "localhost",
-  "controller_port": 12027
-
+  "controller_port": 12027,
+  "controller_backup": "fmdt"
 }
