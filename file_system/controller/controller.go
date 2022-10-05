@@ -140,7 +140,9 @@ func (controller *Controller) registerHandler(connectionHandler *connection.Conn
 
 func (controller *Controller) heartbeatHandler(connectionHandler *connection.ConnectionHandler, message *connection.FileData) {
 	log.Printf("Received heart beat from %s on %s\n", message.SenderId, controller.id)
-	controller.memberTable.RecordBeat(message.SenderId)
+	size := new(big.Int).SetBytes(message.Size)
+	controller.memberTable.RecordBeat(message.SenderId, size)
+
 	//TODO update file metadata with info that is passed in heartbeat
 	//^^ returns a boolean
 	//depending on boolean save file metadata

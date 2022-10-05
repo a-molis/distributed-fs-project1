@@ -253,6 +253,7 @@ func (client *Client) sendChunkInfoController(handler *connection.ConnectionHand
 func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) ([]byte, error) {
 
 	blockingHandlerMap := make(map[string]*BlockingConnection)
+	errorMap := make(map[string]error)
 
 	file, err := os.Open(client.localPath)
 	if err != nil {
@@ -269,55 +270,69 @@ func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) ([]b
 		}
 		checksum.Write(chunkData)
 		//TODO do this bit as a go routine
-		node := chunkMetaMap[chunkName].Nodes[0]
-		blockingHandler := getConnectionHandler(node, blockingHandlerMap)
-
-		blockingHandler.mu.Lock()
-		conHandler := blockingHandler.conHandler
-		// send metadata
-
-		// create messaeg
-		message := &connection.FileData{}
-		message.MessageType = connection.MessageType_PUT
-		message.Path = chunkName
-		message.DataSize = chunkMetaMap[chunkName].size
-		message.Nodes = chunkMetaMap[chunkName].Nodes
-		//we need to also send the file path at the destination
-		message.Data = client.remotePath
-		//message.checksum TODO
-		sum := md5.Sum(chunkData)
-		message.Checksum = sum[:] //create a slice to convert from [16]byte to []byte
-
-		err = conHandler.Send(message)
-		if err != nil {
-			fmt.Println("Error sending chunk metadata to storage node")
-			return nil, err
+		go client.sendChunk(chunkMetaMap, chunkName, blockingHandlerMap, chunkData, errorMap)
+	}
+	for id, e := range errorMap {
+		if e != nil {
+			log.Printf("Error recorded for node %s, error: %s  \n", id, e)
+			return nil, e
 		}
-		log.Println("Client sent chunk metadata to storage node")
-		// wait for ack
-		result, err := conHandler.Receive()
-		if err != nil || result.MessageType != connection.MessageType_ACK_PUT {
-			log.Println("Error receiving ack data for put metadata from storage node on the client")
-			return nil, err
-		}
-		// send chunk
-		err = conHandler.WriteN(chunkData)
-		if err != nil {
-			fmt.Println("Error sending chunk payload to storage node")
-			return nil, err
-		}
-		log.Println("Client wrote the chunk data to node stream")
-		//wait for ack
-		result, err = conHandler.Receive()
-		if err != nil || result.MessageType != connection.MessageType_ACK_PUT {
-			log.Println("Error receiving ack data for put payload from storage node on the client")
-			return nil, err
-		}
-
-		log.Println("sent chunk info to storage node ", chunkName)
-		blockingHandler.mu.Unlock()
 	}
 	return checksum.Sum(nil), nil
+}
+
+func (client *Client) sendChunk(chunkMetaMap map[string]*chunkMeta, chunkName string, blockingHandlerMap map[string]*BlockingConnection, chunkData []byte, errorMap map[string]error) {
+	node := chunkMetaMap[chunkName].Nodes[0]
+	blockingHandler := getConnectionHandler(node, blockingHandlerMap)
+
+	blockingHandler.mu.Lock()
+	conHandler := blockingHandler.conHandler
+	// send metadata
+
+	// create messaeg
+	message := &connection.FileData{}
+	message.MessageType = connection.MessageType_PUT
+	message.Path = chunkName
+	message.DataSize = chunkMetaMap[chunkName].size
+	message.Nodes = chunkMetaMap[chunkName].Nodes
+	//we need to also send the file path at the destination
+	message.Data = client.remotePath
+	//message.checksum TODO
+	sum := md5.Sum(chunkData)
+	message.Checksum = sum[:] //create a slice to convert from [16]byte to []byte
+
+	err := conHandler.Send(message)
+	if err != nil {
+		fmt.Println("Error sending chunk metadata to storage node")
+		errorMap[node.Id] = err
+		//return nil, err
+	}
+	log.Println("Client sent chunk metadata to storage node")
+	// wait for ack
+	result, err := conHandler.Receive()
+	if err != nil || result.MessageType != connection.MessageType_ACK_PUT {
+		log.Println("Error receiving ack data for put metadata from storage node on the client")
+		errorMap[node.Id] = err
+		//return nil, err
+	}
+	// send chunk
+	err = conHandler.WriteN(chunkData)
+	if err != nil {
+		fmt.Println("Error sending chunk payload to storage node")
+		errorMap[node.Id] = err
+		//return nil, err
+	}
+	log.Println("Client wrote the chunk data to node stream")
+	//wait for ack
+	result, err = conHandler.Receive()
+	if err != nil || result.MessageType != connection.MessageType_ACK_PUT {
+		log.Println("Error receiving ack data for put payload from storage node on the client")
+		errorMap[node.Id] = err
+		//return nil, err
+	}
+
+	log.Println("sent chunk info to storage node ", chunkName)
+	blockingHandler.mu.Unlock()
 }
 
 func getChunkData(chunkMetaMap map[string]*chunkMeta, chunkName string, file *os.File) ([]byte, error) {

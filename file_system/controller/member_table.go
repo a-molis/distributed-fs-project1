@@ -63,12 +63,13 @@ func (memberTable *MemberTable) List() []string {
 	return result
 }
 
-func (memberTable *MemberTable) RecordBeat(id string) {
+func (memberTable *MemberTable) RecordBeat(id string, size *big.Int) {
 	memberTable.lock.Lock()
 	defer memberTable.lock.Unlock()
 	member := memberTable.members[id]
 	member.lastBeat = time.Now()
 	member.status = true
+	member.availableSize = size
 	memberTable.members[id] = member
 }
 

@@ -24,6 +24,8 @@ type StorageNode struct {
 	running           bool
 	server            *connection.Server
 	savePath          string
+	storedSize			big.Int
+	totalNumberOfRequests int32
 }
 
 func NewStorageNode(id string, size int64, host string, port int32, config *config.Config, savePath string) *StorageNode {
@@ -33,6 +35,7 @@ func NewStorageNode(id string, size int64, host string, port int32, config *conf
 	storageNode.storageNodePort = port
 	storageNode.config = config
 	storageNode.savePath = savePath
+	storageNode.storedSize.SetInt64(0)
 
 	// input size in MB convert to bytes and stored in Math/big.Int
 	storageNode.size.SetInt64(size)
@@ -79,7 +82,7 @@ func (storageNode *StorageNode) register() {
 	message := &connection.FileData{}
 	message.MessageType = connection.MessageType_REGISTRATION
 	message.SenderId = storageNode.id
-	message.Size = storageNode.size.Bytes()
+	message.Size = storageNode.size.Sub(&storageNode.size, &storageNode.storedSize).Bytes()
 	node := &connection.Node{}
 	node.Port = storageNode.storageNodePort
 	node.Hostname = storageNode.storageNodeHost
@@ -100,7 +103,8 @@ func (storageNode *StorageNode) heartbeat() {
 	message := &connection.FileData{}
 	message.MessageType = connection.MessageType_HEARTBEAT
 	message.SenderId = storageNode.id
-	message.Size = storageNode.size.Bytes() //TODO this information should be sent in registration instead
+	message.Size = storageNode.size.Sub(&storageNode.size, &storageNode.storedSize).Bytes()
+	message.NumberOfRequests = storageNode.totalNumberOfRequests
 	for storageNode.running {
 		err := storageNode.connectionHandler.Send(message)
 		if err != nil {
@@ -178,6 +182,9 @@ func (storageNode *StorageNode) uploadHandler(connectionHandler *connection.Conn
 	} else {
 		log.Printf("chunk %s saved \n", path)
 	}
+	//update the stored size in the node with the new chunk size
+	storageNode.addToStoredSize(size)
+	storageNode.totalNumberOfRequests++
 
 	//send back ack
 	response = &connection.FileData{}
@@ -193,6 +200,11 @@ func (storageNode *StorageNode) uploadHandler(connectionHandler *connection.Conn
 	}
 }
 
+func (storageNode *StorageNode) addToStoredSize(size int64) {
+	bigIntSize := big.NewInt(size)
+	storageNode.storedSize.Set(storageNode.storedSize.Add(&storageNode.storedSize, bigIntSize))
+}
+
 func (storageNode *StorageNode) chunkHeartbeat(message *connection.FileData) {
 	heartbeatMessage := &connection.FileData{}
 	heartbeatMessage.SenderId = storageNode.id
@@ -200,6 +212,9 @@ func (storageNode *StorageNode) chunkHeartbeat(message *connection.FileData) {
 	heartbeatMessage.Path = message.Data //this is the file path
 	heartbeatMessage.Data = message.Path //this is the chunk name
 	heartbeatMessage.Checksum = message.Checksum
+	heartbeatMessage.NumberOfRequests = storageNode.totalNumberOfRequests
+
+	heartbeatMessage.Size = storageNode.size.Sub(&storageNode.size, &storageNode.storedSize).Bytes()
 
 	storageNode.connectionHandler.Send(heartbeatMessage)
 }
@@ -294,6 +309,7 @@ func (storageNode *StorageNode) downloadHandler(handler *connection.ConnectionHa
 	if lastAck.MessageType != connection.MessageType_ACK_GET {
 		log.Printf("Error ack for downlaod data client on storage node %s", storageNode.id)
 	}
+	storageNode.totalNumberOfRequests++
 }
 
 func (storageNode *StorageNode) reconnect() {

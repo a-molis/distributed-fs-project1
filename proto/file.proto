@@ -29,6 +29,7 @@ message FileData {
     Node node = 8;
     int64 dataSize = 9;
     repeated Node nodes = 10;
+    int32 numberOfRequests = 11;
 }
 
 message Node {
