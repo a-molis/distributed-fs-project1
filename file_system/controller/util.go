@@ -69,7 +69,7 @@ func findAvailableNodes(chunks map[string]*file_metadata.Chunk, memberTable *Mem
 		// TODO handle case when storage nodes are full
 		for j := 0; j < numReplicas; {
 			idx := rand.Intn(len(listOfNodes))
-			if memberTable.members[listOfNodes[idx]].availableSize.Cmp(big.NewInt(chunk.Size)) >= 0 && !contains(listOfNodes[idx], chunk.StorageNodes) {
+			if memberTable.members[listOfNodes[idx]].availableSize.Cmp(big.NewInt(chunk.Size)) >= 0 && !contains(listOfNodes[idx], chunk.StorageNodes) && memberTable.members[listOfNodes[idx]].status {
 				chunk.StorageNodes = append(chunk.StorageNodes, listOfNodes[idx])
 				member := memberTable.members[listOfNodes[idx]]
 				member.availableSize.Set(member.availableSize.Sub(member.availableSize, big.NewInt(chunk.Size)))

@@ -319,7 +319,7 @@ func TestClientDownloadSimple(t *testing.T) {
 		_, clientPutError = testClient.Run()
 	}()
 
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 20)
 
 	var clientGetError error = nil
 	go func() {

@@ -255,7 +255,7 @@ func (controller *Controller) SaveFileMetadata() {
 func (controller *Controller) LoadFileMetadata() error {
 	_, err := os.Stat(controller.config.ControllerPath)
 	if err != nil {
-		log.Println("Error closing file for meta data load")
+		log.Println("Error finding file for meta data load")
 		return nil
 	}
 
@@ -288,8 +288,9 @@ func (controller *Controller) LoadFileMetadata() error {
 func (controller *Controller) getHandler(handler *connection.ConnectionHandler, message *connection.FileData) {
 	sendMessage := &connection.FileData{}
 
-	// TODO add check if in pending state
+	// TODO add check if in pending state //done
 	chunks, checksum, err := controller.fileMetadata.Download(message.Path)
+	controller.removeDeadNodes(chunks)
 	if err != nil {
 		sendMessage.Data = fmt.Sprintf("%s", err)
 		sendMessage.MessageType = connection.MessageType_ERROR
@@ -303,6 +304,17 @@ func (controller *Controller) getHandler(handler *connection.ConnectionHandler, 
 	sendMessage.Chunk = chunkToProto(chunks, controller.memberTable)
 	sendMessage.MessageType = connection.MessageType_GET
 	err = handler.Send(sendMessage)
+}
+
+func (controller *Controller) removeDeadNodes(chunks map[string]*file_metadata.Chunk) {
+	for _, v := range chunks {
+		for i, n := range v.StorageNodes {
+			if !controller.memberTable.members[n].status {
+				// if the member is inactive remove it from the list
+				v.StorageNodes = append(v.StorageNodes[:i], v.StorageNodes[i+1:]...)
+			}
+		}
+	}
 }
 
 func (controller *Controller) rmHandler(handler *connection.ConnectionHandler, message *connection.FileData) {

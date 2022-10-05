@@ -254,6 +254,7 @@ func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) ([]b
 
 	blockingHandlerMap := make(map[string]*BlockingConnection)
 	errorMap := make(map[string]error)
+	errorLock := &sync.Mutex{}
 
 	file, err := os.Open(client.localPath)
 	if err != nil {
@@ -270,7 +271,7 @@ func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) ([]b
 		}
 		checksum.Write(chunkData)
 		//TODO do this bit as a go routine
-		go client.sendChunk(chunkMetaMap, chunkName, blockingHandlerMap, chunkData, errorMap)
+		go client.sendChunk(chunkMetaMap, chunkName, blockingHandlerMap, chunkData, errorMap, errorLock)
 	}
 	for id, e := range errorMap {
 		if e != nil {
@@ -281,7 +282,7 @@ func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) ([]b
 	return checksum.Sum(nil), nil
 }
 
-func (client *Client) sendChunk(chunkMetaMap map[string]*chunkMeta, chunkName string, blockingHandlerMap map[string]*BlockingConnection, chunkData []byte, errorMap map[string]error) {
+func (client *Client) sendChunk(chunkMetaMap map[string]*chunkMeta, chunkName string, blockingHandlerMap map[string]*BlockingConnection, chunkData []byte, errorMap map[string]error, mutex *sync.Mutex) {
 	node := chunkMetaMap[chunkName].Nodes[0]
 	blockingHandler := getConnectionHandler(node, blockingHandlerMap)
 
@@ -304,7 +305,9 @@ func (client *Client) sendChunk(chunkMetaMap map[string]*chunkMeta, chunkName st
 	err := conHandler.Send(message)
 	if err != nil {
 		fmt.Println("Error sending chunk metadata to storage node")
+		mutex.Lock()
 		errorMap[node.Id] = err
+		mutex.Unlock()
 		//return nil, err
 	}
 	log.Println("Client sent chunk metadata to storage node")
@@ -312,23 +315,26 @@ func (client *Client) sendChunk(chunkMetaMap map[string]*chunkMeta, chunkName st
 	result, err := conHandler.Receive()
 	if err != nil || result.MessageType != connection.MessageType_ACK_PUT {
 		log.Println("Error receiving ack data for put metadata from storage node on the client")
+		mutex.Lock()
 		errorMap[node.Id] = err
-		//return nil, err
+		mutex.Unlock()
 	}
 	// send chunk
 	err = conHandler.WriteN(chunkData)
 	if err != nil {
 		fmt.Println("Error sending chunk payload to storage node")
+		mutex.Lock()
 		errorMap[node.Id] = err
-		//return nil, err
+		mutex.Unlock()
 	}
 	log.Println("Client wrote the chunk data to node stream")
 	//wait for ack
 	result, err = conHandler.Receive()
 	if err != nil || result.MessageType != connection.MessageType_ACK_PUT {
 		log.Println("Error receiving ack data for put payload from storage node on the client")
+		mutex.Lock()
 		errorMap[node.Id] = err
-		//return nil, err
+		mutex.Unlock()
 	}
 
 	log.Println("sent chunk info to storage node ", chunkName)
