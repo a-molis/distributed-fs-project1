@@ -59,7 +59,8 @@ func (storageNode *StorageNode) Start() {
 		log.Fatalf("Unable to create listener on storage node %s", storageNode.id)
 	}
 	storageNode.server = server
-	go storageNode.listen()
+	storageNode.listen()
+	log.Println("Storage node listener shut down ", storageNode.id)
 }
 
 func (storageNode *StorageNode) createControllerConn() error {
@@ -76,6 +77,8 @@ func (storageNode *StorageNode) createControllerConn() error {
 
 func (storageNode *StorageNode) Shutdown() {
 	storageNode.running = false
+	err := storageNode.server.Shutdown()
+	log.Println("Error shutting down storage node server ", err)
 }
 
 func (storageNode *StorageNode) register() {
@@ -112,6 +115,7 @@ func (storageNode *StorageNode) heartbeat() {
 		}
 		time.Sleep(heartBeatRate)
 	}
+	log.Println("Storage node heartbeats shutting down... ", storageNode.id)
 }
 
 func (storageNode *StorageNode) listen() {
@@ -122,6 +126,7 @@ func (storageNode *StorageNode) listen() {
 		}
 		go storageNode.handleConnection(connectionHandler)
 	}
+	log.Println("Storage node listener shutting down... ", storageNode.id)
 }
 
 func (storageNode *StorageNode) handleConnection(connectionHandler *connection.ConnectionHandler) {
@@ -144,7 +149,6 @@ func (storageNode *StorageNode) handleConnection(connectionHandler *connection.C
 func (storageNode *StorageNode) uploadHandler(connectionHandler *connection.ConnectionHandler, message *connection.FileData) {
 	size := message.DataSize
 	path := message.Path
-	//nodes := message.Nodes
 	//extract file path to be used for heartbeat
 
 	//prepare ack

@@ -81,13 +81,13 @@ func TestHeartBeatInactive(t *testing.T) {
 
 	time.Sleep(time.Second * 1)
 
-	go func(id string) {
-		storageNode := storage.NewStorageNode(id, size, "localHost", storagePort0, testConfig, savePathStorageNode0)
+	storageNode := storage.NewStorageNode(testId, size, "localHost", storagePort0, testConfig, savePathStorageNode0)
+	go func() {
 		storageNode.Start()
-		storageNode.Shutdown()
-	}(testId)
-
-	time.Sleep(time.Second * 25)
+	}()
+	time.Sleep(time.Second * 3)
+	storageNode.Shutdown()
+	time.Sleep(time.Second * 15)
 
 	if len(members) != 0 {
 		t.Fatalf("the registered node did not switch to inactive")
@@ -257,9 +257,15 @@ func TestControllerCrashRecovery(t *testing.T) {
 			newName := fmt.Sprintf("%s%d", name, i)
 			for j := 0; j < 5; j++ {
 				fullPath := fmt.Sprintf("./sn%d/%s", j, newName)
-				os.Remove(fullPath)
+				err = os.Remove(fullPath)
+				if err != nil {
+					log.Println("error removing storage data", err)
+				}
 				dirName := fmt.Sprintf("./sn%d", j)
-				os.RemoveAll(dirName)
+				err2 := os.RemoveAll(dirName)
+				if err2 != nil {
+					log.Println("error removing storage data", err2)
+				}
 			}
 		}
 	}()
@@ -282,7 +288,7 @@ func TestControllerCrashRecovery(t *testing.T) {
 	defer func(name string) {
 		err := os.Remove(name)
 		if err != nil {
-			t.Error("Unable to remove controller backup")
+			log.Println("Unable to remove controller backup")
 		}
 	}(testConfig.ControllerPath)
 
@@ -378,14 +384,9 @@ func TestControllerCrashRecovery(t *testing.T) {
 			clientPutError, clientLsError0, clientLsError1)
 	}
 
-	if clientPutError != nil || clientLsError1 != nil {
-		t.Fatalf("client test failed %s %s ",
-			clientPutError, clientLsError1)
-	}
 	if !strings.Contains(*lsResult0, uploadPath) {
 		t.Fatalf("Result %s should contain %s ", *lsResult0, uploadPath)
 	}
-	log.Printf("found file %s", *lsResult0)
 
 	if !strings.Contains(*lsResult1, uploadPath) {
 		t.Fatalf("Result %s should contain %s ", *lsResult1, uploadPath)
