@@ -3,6 +3,7 @@ package controller
 import (
 	"dfs/connection"
 	"errors"
+	"fmt"
 	"log"
 	"math/big"
 	"sync"
@@ -16,12 +17,13 @@ type MemberTable struct {
 }
 
 type Member struct {
-	status        bool
-	lastBeat      time.Time
-	availableSize *big.Int
-	port          int32
-	host          string
-	handler       *connection.ConnectionHandler
+	status                bool
+	lastBeat              time.Time
+	availableSize         *big.Int
+	port                  int32
+	host                  string
+	handler               *connection.ConnectionHandler
+	totalNumberOfRequests int32
 }
 
 func NewMemberTable() *MemberTable {
@@ -63,13 +65,14 @@ func (memberTable *MemberTable) List() []string {
 	return result
 }
 
-func (memberTable *MemberTable) RecordBeat(id string, size *big.Int) {
+func (memberTable *MemberTable) RecordBeat(id string, size *big.Int, totalNumberOfRequests int32) {
 	memberTable.lock.Lock()
 	defer memberTable.lock.Unlock()
 	member := memberTable.members[id]
 	member.lastBeat = time.Now()
 	member.status = true
 	member.availableSize = size
+	member.totalNumberOfRequests = totalNumberOfRequests
 	memberTable.members[id] = member
 }
 
@@ -106,4 +109,15 @@ func (memberTable *MemberTable) Shutdown() {
 			}
 		}
 	}
+}
+
+func (memberTable *MemberTable) Stats() (string, error) {
+	output := "StroageNode\t\t\t\t\t\tFreespace\t\t\tRequests"
+	memberTable.lock.Lock()
+	defer memberTable.lock.Unlock()
+	for member := range memberTable.members {
+		m := memberTable.members[member]
+		output = output + "\n" + fmt.Sprintf("%s\t\t\t%s\t\t\t%d", member, m.availableSize, m.totalNumberOfRequests)
+	}
+	return output, nil
 }

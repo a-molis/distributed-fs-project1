@@ -58,10 +58,11 @@ func NewClient(config *Config, command string, args ...string) *Client {
 
 var (
 	commandMap = map[string]connection.MessageType{
-		"ls":  connection.MessageType_LS,
-		"rm":  connection.MessageType_RM,
-		"put": connection.MessageType_PUT,
-		"get": connection.MessageType_GET,
+		"ls":    connection.MessageType_LS,
+		"rm":    connection.MessageType_RM,
+		"put":   connection.MessageType_PUT,
+		"get":   connection.MessageType_GET,
+		"stats": connection.MessageType_STATS,
 	}
 )
 
@@ -130,6 +131,8 @@ func (client *Client) sendToController(err error, message *connection.FileData, 
 	} else if result.MessageType == connection.MessageType_ERROR {
 		log.Println("Error: ", result.Data)
 		return nil, errors.New(fmt.Sprintf("Error: %s", result.Data))
+	} else if result.MessageType == connection.MessageType_STATS {
+		return client.stats(result, connectionHandler)
 	} else {
 		log.Println("Error client unable to get result from controller")
 		return nil, errors.New("error client unable to get result from controller")
@@ -511,6 +514,11 @@ func (client *Client) rm(result *connection.FileData, handler *connection.Connec
 	log.Printf("Number of chunks to remvoe %d\n", len(chunkData.Chunk))
 	fmt.Printf("Removed %s\n", path)
 	return nil
+}
+
+func (client *Client) stats(result *connection.FileData, handler *connection.ConnectionHandler) (*string, error) {
+	fmt.Println(result.Data)
+	return &result.Data, nil
 }
 
 func clientChunkToProto(chunkMeta *chunkMeta) *connection.Chunk {

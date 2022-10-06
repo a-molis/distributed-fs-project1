@@ -93,6 +93,8 @@ func (controller *Controller) handleConnection(connectionHandler *connection.Con
 			go controller.rmHandler(connectionHandler, message)
 		} else if message.MessageType == connection.MessageType_CHECKSUM {
 			go controller.updateCheckSum(connectionHandler, message)
+		} else if message.MessageType == connection.MessageType_STATS {
+			go controller.statsHandler(connectionHandler, message)
 		}
 	}
 }
@@ -141,7 +143,7 @@ func (controller *Controller) registerHandler(connectionHandler *connection.Conn
 func (controller *Controller) heartbeatHandler(connectionHandler *connection.ConnectionHandler, message *connection.FileData) {
 	log.Printf("Received heart beat from %s on %s\n", message.SenderId, controller.id)
 	size := new(big.Int).SetBytes(message.Size)
-	controller.memberTable.RecordBeat(message.SenderId, size)
+	controller.memberTable.RecordBeat(message.SenderId, size, message.NumberOfRequests)
 
 	//TODO update file metadata with info that is passed in heartbeat
 	//^^ returns a boolean
@@ -159,21 +161,6 @@ func (controller *Controller) List() []string {
 }
 
 func (controller *Controller) uploadHandler(connectionHandler *connection.ConnectionHandler, connectionChan <-chan *connection.FileData, message *connection.FileData) {
-	// TODO add logic
-	// 1. client connect and requests to upload chunks and names of chunks
-	// filename, chunk name, chunk size, overall checksum, chunk checksum
-	// 2. check in FileMetadata if path exists - if exists send error back
-	// 3. If path does not exist
-	//  - reserve the path with a pending state
-	// 4. go to member table to ask for nodes that have enough space. -> if there is not enough space on enough nodes return message saying out of space
-	// 5. if enough space member table returns list of storage nodes per chunk
-	// 6 reserve space on member table -- subtract space out
-	// 7. return chunk info to client
-	//    - Wait for ack from client that client got list of chunks
-	// 8. Get heart beat message from storage node that chunk is uploaded to storage node
-	// 9. When N number of storage nodes respond back with ack of file then set status to Complete
-	// end.
-
 	filepath := message.GetPath()
 	if filepath == "" {
 		// TODO send error back to client
@@ -340,5 +327,22 @@ func (controller *Controller) rmHandler(handler *connection.ConnectionHandler, m
 	err = handler.Send(deleteMessage)
 	if err != nil {
 		log.Println("Error sending delete chunks to client")
+	}
+}
+
+func (controller *Controller) statsHandler(handler *connection.ConnectionHandler, message *connection.FileData) {
+	stats, err := controller.memberTable.Stats()
+	statMessage := &connection.FileData{}
+	if err != nil {
+		statMessage.MessageType = connection.MessageType_ERROR
+		statMessage.Data = "Server error getting stats"
+	} else {
+		statMessage.Data = stats
+		statMessage.MessageType = connection.MessageType_STATS
+	}
+
+	err = handler.Send(statMessage)
+	if err != nil {
+		log.Println("Error sending stats to client from controller ", controller.id)
 	}
 }

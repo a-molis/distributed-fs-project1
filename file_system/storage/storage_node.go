@@ -15,16 +15,16 @@ import (
 )
 
 type StorageNode struct {
-	id                string
-	size              big.Int
-	storageNodeHost   string
-	storageNodePort   int32
-	config            *config.Config
-	connectionHandler *connection.ConnectionHandler
-	running           bool
-	server            *connection.Server
-	savePath          string
-	storedSize			big.Int
+	id                    string
+	size                  big.Int
+	storageNodeHost       string
+	storageNodePort       int32
+	config                *config.Config
+	connectionHandler     *connection.ConnectionHandler
+	running               bool
+	server                *connection.Server
+	savePath              string
+	storedSize            big.Int
 	totalNumberOfRequests int32
 }
 
@@ -103,9 +103,9 @@ func (storageNode *StorageNode) heartbeat() {
 	message := &connection.FileData{}
 	message.MessageType = connection.MessageType_HEARTBEAT
 	message.SenderId = storageNode.id
-	message.Size = storageNode.size.Sub(&storageNode.size, &storageNode.storedSize).Bytes()
-	message.NumberOfRequests = storageNode.totalNumberOfRequests
 	for storageNode.running {
+		message.Size = storageNode.size.Sub(&storageNode.size, &storageNode.storedSize).Bytes()
+		message.NumberOfRequests = storageNode.totalNumberOfRequests
 		err := storageNode.connectionHandler.Send(message)
 		if err != nil {
 			storageNode.reconnect()

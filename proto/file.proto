@@ -16,6 +16,7 @@ enum MessageType {
     ACK_GET = 11;
     CHECKSUM = 12;
     HEARTBEAT_CHUNK = 13;
+    STATS = 14;
 }
 
 message FileData {
