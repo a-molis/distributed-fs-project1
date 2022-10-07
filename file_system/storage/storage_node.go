@@ -174,7 +174,7 @@ func (storageNode *StorageNode) uploadHandler(connectionHandler *connection.Conn
 	if err != nil {
 		log.Println("Directory might alreay exist ", err)
 	}
-	file, err := os.Create("./" + dirname + "/" + path)
+	file, err := os.Create(dirname + "/" + path)
 	defer file.Close()
 	if err != nil {
 		log.Println("Error opening file ", path, err)

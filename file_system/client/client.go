@@ -163,6 +163,7 @@ func (client *Client) put(result *connection.FileData, connectionHandler *connec
 		log.Println("Error sending chunk info from client to server ", err)
 		return errors.New(fmt.Sprintf("Error sending chunk info from client to server %s", err))
 	}
+	log.Println("Client sent chunk info to the controller")
 
 	//TODO call function that sends chunks to the storage nodes defined in chunkMetaMap
 	// map with storage node and connection handler
@@ -187,6 +188,7 @@ func (client *Client) sendCheckSumToController(checkSum []byte, handler *connect
 	message.Path = client.remotePath
 	err := handler.Send(message)
 	if err != nil {
+		log.Println("Error sending checksum to controller")
 		return err
 	}
 	ack, err := handler.Receive()
@@ -194,6 +196,7 @@ func (client *Client) sendCheckSumToController(checkSum []byte, handler *connect
 		log.Println("Error receiving ack from controller for file checksum ", err)
 		return errors.New("error sending checksum to controller")
 	}
+	log.Println("Client sent checksum to controller for file")
 	return nil
 }
 
@@ -254,7 +257,8 @@ func (client *Client) sendChunkInfoController(handler *connection.ConnectionHand
 }
 
 func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) ([]byte, error) {
-
+	log.Println("Client sending data to nodes")
+	wait := &sync.WaitGroup{}
 	blockingHandlerMap := make(map[string]*BlockingConnection)
 	errorMap := make(map[string]error)
 	errorLock := &sync.Mutex{}
@@ -266,15 +270,14 @@ func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) ([]b
 	}
 	checksum := sha256.New()
 	for chunkName := range chunkMetaMap {
-
 		chunkData, err := getChunkData(chunkMetaMap, chunkName, file)
 		if err != nil {
 			log.Println("Error getting chunk data for chunk ", chunkName)
 			return nil, err
 		}
 		checksum.Write(chunkData)
-		//TODO do this bit as a go routine
-		go client.sendChunk(chunkMetaMap, chunkName, blockingHandlerMap, chunkData, errorMap, errorLock)
+		wait.Add(1)
+		go client.sendChunk(chunkMetaMap, chunkName, blockingHandlerMap, chunkData, errorMap, errorLock, wait)
 	}
 	for id, e := range errorMap {
 		if e != nil {
@@ -282,10 +285,13 @@ func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) ([]b
 			return nil, e
 		}
 	}
+	wait.Wait()
+	log.Println("Client finished sending data to storage nodes")
 	return checksum.Sum(nil), nil
 }
 
-func (client *Client) sendChunk(chunkMetaMap map[string]*chunkMeta, chunkName string, blockingHandlerMap map[string]*BlockingConnection, chunkData []byte, errorMap map[string]error, mutex *sync.Mutex) {
+func (client *Client) sendChunk(chunkMetaMap map[string]*chunkMeta, chunkName string, blockingHandlerMap map[string]*BlockingConnection, chunkData []byte, errorMap map[string]error, mutex *sync.Mutex, wait *sync.WaitGroup) {
+	defer wait.Done()
 	// create message
 	message := &connection.FileData{}
 	message.MessageType = connection.MessageType_PUT
@@ -447,7 +453,6 @@ func getChunkFromStorage(chunk *connection.Chunk, handlerMap map[string]*Blockin
 		log.Println("Error getting data from storage node")
 
 	}
-
 
 	saveLock.Cond.L.Lock()
 	sent := false
