@@ -926,3 +926,149 @@ func TestClientStats(t *testing.T) {
 	}
 	return
 }
+
+func TestClientDownloadFailingNodes(t *testing.T) {
+	savePath := "testdata/downloadCopySimple.txt"
+	defer func(savePath string) {
+		err := os.Remove(savePath)
+		if err != nil {
+			log.Printf("Unable to delete file at %s", savePath)
+		}
+	}(savePath)
+	defer func() {
+		name := "this_test_path_footxt_"
+		for i := 0; i < 10; i++ {
+			newName := fmt.Sprintf("%s%d", name, i)
+			for j := 0; j < 5; j++ {
+				fullPath := fmt.Sprintf("./sn%d/%s", j, newName)
+				os.Remove(fullPath)
+				log.Println(fullPath)
+				dirName := fmt.Sprintf("./sn%d", j)
+				err := os.RemoveAll(dirName)
+				if err != nil {
+					log.Printf("Error removing %s %s", dirName, err)
+				}
+				log.Println("removing dir", dirName)
+				pwd, err := os.Getwd()
+				if err != nil {
+					fmt.Println(err)
+					os.Exit(1)
+				}
+				log.Println(pwd)
+			}
+		}
+	}()
+
+	controllerHost := "localhost"
+	storageHost := "localhost"
+	controllerPort := 12090
+	var storagePort0 int32 = 12091
+	var storagePort1 int32 = 12092
+	var storagePort2 int32 = 12093
+	var storagePort3 int32 = 12094
+	var storagePort4 int32 = 12095
+	var size int64 = 1000000
+	var chunkSize int64 = 5000000
+
+	testConfig, err := config.ConfigFromPath("../config.json")
+	if err != nil {
+		t.Errorf("Unable to open config")
+		return
+	}
+
+	err = os.Remove(testConfig.ControllerPath)
+	if err != nil {
+		log.Println("Unable to remove controller backup ", err)
+	}
+
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			log.Println("Unable to remove controller backup")
+		}
+	}(testConfig.ControllerPath)
+
+	testConfig.ChunkSize = chunkSize
+	testConfig.ControllerHost = controllerHost
+	testConfig.ControllerPort = controllerPort
+
+	remotePath := "/this/test/path/foo.txt"
+	localPath := "testdata/testFile.txt"
+
+	testStorageNode0 := "testStorageNode0"
+	testStorageNode1 := "testStorageNode1"
+	testStorageNode2 := "testStorageNode2"
+	testStorageNode3 := "testStorageNode3"
+	testStorageNode4 := "testStorageNode4"
+
+	savePathStorageNode0 := "sn0"
+	savePathStorageNode1 := "sn1"
+	savePathStorageNode2 := "sn2"
+	savePathStorageNode3 := "sn3"
+	savePathStorageNode4 := "sn4"
+
+	var members []string
+
+	go func(receivedMembers *[]string) {
+		testController := controller.NewController("testId", testConfig)
+		testController.Start()
+		time.Sleep(time.Second * 1)
+		*receivedMembers = testController.List()
+	}(&members)
+
+	time.Sleep(time.Second * 1)
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode0, size, storageHost, storagePort0, testConfig, savePathStorageNode0)
+		storageNode.Start()
+		time.Sleep(time.Second * 1)
+	}()
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode1, size, storageHost, storagePort1, testConfig, savePathStorageNode1)
+		storageNode.Start()
+	}()
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode2, size, storageHost, storagePort2, testConfig, savePathStorageNode2)
+		storageNode.Start()
+	}()
+
+	storageNode1 := storage.NewStorageNode(testStorageNode3, size, storageHost, storagePort3, testConfig, savePathStorageNode3)
+	go storageNode1.Start()
+	go func (storageNode *storage.StorageNode) {
+		time.Sleep(time.Second * 20)
+		storageNode.Shutdown()
+	}(storageNode1)
+
+
+	storageNode2 := storage.NewStorageNode(testStorageNode4, size, storageHost, storagePort4, testConfig, savePathStorageNode4)
+	go storageNode2.Start()
+	go func (storageNode *storage.StorageNode) {
+		time.Sleep(time.Second * 20)
+		storageNode.Shutdown()
+	}(storageNode2)
+
+	time.Sleep(time.Second * 3)
+	var clientPutError error = nil
+	go func() {
+		testClient := NewClient(testConfig, "put", remotePath, localPath)
+		_, clientPutError = testClient.Run()
+	}()
+
+	time.Sleep(time.Second * 40)
+
+	var clientGetError error = nil
+	go func() {
+		testClient := NewClient(testConfig, "get", remotePath, savePath)
+		_, clientGetError = testClient.Run()
+	}()
+
+	time.Sleep(time.Second * 10)
+
+	// TODO complete test to validate file is saved
+	if clientGetError != nil || clientPutError != nil {
+		t.Fatalf("client test failed %s, %s", clientGetError, clientPutError)
+	}
+	return
+}

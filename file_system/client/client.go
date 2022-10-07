@@ -286,62 +286,67 @@ func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) ([]b
 }
 
 func (client *Client) sendChunk(chunkMetaMap map[string]*chunkMeta, chunkName string, blockingHandlerMap map[string]*BlockingConnection, chunkData []byte, errorMap map[string]error, mutex *sync.Mutex) {
-	node := chunkMetaMap[chunkName].Nodes[0]
-	blockingHandler := getConnectionHandler(node, blockingHandlerMap)
-
-	blockingHandler.mu.Lock()
-	conHandler := blockingHandler.conHandler
-	// send metadata
-
-	// create messaeg
+	// create message
 	message := &connection.FileData{}
 	message.MessageType = connection.MessageType_PUT
 	message.Path = chunkName
 	message.DataSize = chunkMetaMap[chunkName].size
 	message.Nodes = chunkMetaMap[chunkName].Nodes
-	//we need to also send the file path at the destination
 	message.Data = client.remotePath
-	//message.checksum TODO
 	sum := md5.Sum(chunkData)
 	message.Checksum = sum[:] //create a slice to convert from [16]byte to []byte
-
-	err := conHandler.Send(message)
+	var node *connection.Node
+	var err error
+	for _, node = range chunkMetaMap[chunkName].Nodes {
+		blockingHandler, err := getConnectionHandler(node, blockingHandlerMap)
+		if err != nil {
+			log.Printf("had issue dialing node %s \n", node.Id)
+			continue
+		}
+		//send metadata and payload
+		blockingHandler.mu.Lock()
+		err = client.tryNode(blockingHandler.conHandler, message, chunkData)
+		blockingHandler.mu.Unlock()
+		if err == nil {
+			break
+		}
+		log.Printf("had issue sending chunk %s to node %s \n", chunkName, node.Id)
+	}
 	if err != nil {
-		fmt.Println("Error sending chunk metadata to storage node")
 		mutex.Lock()
 		errorMap[node.Id] = err
 		mutex.Unlock()
-		//return nil, err
+	}
+	log.Printf("sent chunk %s info to storage node %s \n", chunkName, node.Id)
+}
+
+func (client *Client) tryNode(conHandler *connection.ConnectionHandler, message *connection.FileData, chunkData []byte) error {
+	err := conHandler.Send(message)
+	if err != nil {
+		fmt.Println("Error sending chunk metadata to storage node")
+		return err
 	}
 	log.Println("Client sent chunk metadata to storage node")
 	// wait for ack
 	result, err := conHandler.Receive()
 	if err != nil || result.MessageType != connection.MessageType_ACK_PUT {
 		log.Println("Error receiving ack data for put metadata from storage node on the client")
-		mutex.Lock()
-		errorMap[node.Id] = err
-		mutex.Unlock()
+		return err
 	}
 	// send chunk
 	err = conHandler.WriteN(chunkData)
 	if err != nil {
 		fmt.Println("Error sending chunk payload to storage node")
-		mutex.Lock()
-		errorMap[node.Id] = err
-		mutex.Unlock()
+		return err
 	}
 	log.Println("Client wrote the chunk data to node stream")
 	//wait for ack
 	result, err = conHandler.Receive()
 	if err != nil || result.MessageType != connection.MessageType_ACK_PUT {
 		log.Println("Error receiving ack data for put payload from storage node on the client")
-		mutex.Lock()
-		errorMap[node.Id] = err
-		mutex.Unlock()
+		return err
 	}
-
-	log.Println("sent chunk info to storage node ", chunkName)
-	blockingHandler.mu.Unlock()
+	return nil
 }
 
 func getChunkData(chunkMetaMap map[string]*chunkMeta, chunkName string, file *os.File) ([]byte, error) {
@@ -357,7 +362,7 @@ func getChunkData(chunkMetaMap map[string]*chunkMeta, chunkName string, file *os
 	return chunkData, err
 }
 
-func getConnectionHandler(node *connection.Node, handlerMap map[string]*BlockingConnection) *BlockingConnection {
+func getConnectionHandler(node *connection.Node, handlerMap map[string]*BlockingConnection) (*BlockingConnection, error) {
 	blockingConnection, ok := handlerMap[node.Id]
 	if !ok {
 		blockingConnection = &BlockingConnection{}
@@ -366,11 +371,12 @@ func getConnectionHandler(node *connection.Node, handlerMap map[string]*Blocking
 		if err != nil {
 			log.Println("error connecting to node ", node.Hostname, " ", node.Port)
 			// TODO make this trigger switching to next node and repeat this iteration of the loop
+			return nil, errors.New("cannot connect to node")
 		}
 		handlerMap[node.Id] = blockingConnection
 	}
 
-	return blockingConnection
+	return blockingConnection, nil
 }
 
 func (client *Client) get(result *connection.FileData, handler *connection.ConnectionHandler) error {
@@ -419,15 +425,30 @@ func (client *Client) get(result *connection.FileData, handler *connection.Conne
 func getChunkFromStorage(chunk *connection.Chunk, handlerMap map[string]*BlockingConnection,
 	nextChunkNum *AtomicInt, saveLock *WaitNotify, downloadChan chan []byte) {
 	// TODO should not just get the first node, should check other nodes if this fails
-	blockingHandler := getConnectionHandler(chunk.Nodes[0], handlerMap)
-	blockingHandler.mu.Lock()
-	conn := blockingHandler.conHandler
 
-	data, err := getBytesFromStorage(conn, chunk)
-	if err != nil {
-		// TODO continue in loop to get chunk from other node if not found on first node
-		log.Fatalln("Error getting data from storage node")
+	var data []byte
+	var err error
+	for _, node := range chunk.Nodes {
+
+		blockingHandler, err2 := getConnectionHandler(node, handlerMap)
+		if err2 != nil {
+			log.Println("Error dialing node")
+			continue
+		}
+		blockingHandler.mu.Lock()
+		conn := blockingHandler.conHandler
+
+		data, err = getBytesFromStorage(conn, chunk)
+		blockingHandler.mu.Unlock()
+		if err == nil {
+			break
+		}
+
+		log.Println("Error getting data from storage node")
+
 	}
+
+
 	saveLock.Cond.L.Lock()
 	sent := false
 	for !sent {
@@ -441,7 +462,6 @@ func getChunkFromStorage(chunk *connection.Chunk, handlerMap map[string]*Blockin
 		saveLock.Cond.Wait()
 	}
 
-	blockingHandler.mu.Unlock()
 }
 
 func getBytesFromStorage(conn *connection.ConnectionHandler, chunk *connection.Chunk) ([]byte, error) {

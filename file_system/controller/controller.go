@@ -298,7 +298,11 @@ func (controller *Controller) removeDeadNodes(chunks map[string]*file_metadata.C
 		for i, n := range v.StorageNodes {
 			if !controller.memberTable.members[n].status {
 				// if the member is inactive remove it from the list
-				v.StorageNodes = append(v.StorageNodes[:i], v.StorageNodes[i+1:]...)
+				if i >= len(v.StorageNodes)-1 {
+					v.StorageNodes = v.StorageNodes[:len(v.StorageNodes)-1]
+				} else {
+					v.StorageNodes = append(v.StorageNodes[:i], v.StorageNodes[i+1:]...)
+				}
 			}
 		}
 	}
