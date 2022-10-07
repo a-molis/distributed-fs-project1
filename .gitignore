@@ -3,3 +3,5 @@ fmdt
 dfs
 bin
 downloadCopy*
+scripts/logs
+*.swp
