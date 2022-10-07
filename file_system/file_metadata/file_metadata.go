@@ -119,6 +119,9 @@ func (fileMetadata *FileMetadata) Download(path string) (map[string]*Chunk, []by
 		return nil, nil, errors.New("File does not exist")
 	}
 	file := directoryNode.Files[fileName]
+	if file == nil {
+		return nil, nil, errors.New("Filename does not exist")
+	}
 	if file.Status == Pending {
 		return nil, nil, errors.New("File still pending")
 	}
