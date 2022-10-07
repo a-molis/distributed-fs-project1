@@ -455,9 +455,14 @@ func TestClientRmSimple(t *testing.T) {
 	time.Sleep(time.Second * 3)
 
 	var clientRmError error = nil
+	var rmResult0 *string
+	empty := ""
+	rmResult0 = &empty
 	go func() {
 		testClient := NewClient(testConfig, "rm", remotePath)
-		_, clientRmError = testClient.Run()
+		result, err := testClient.Run()
+		clientRmError = err
+		*rmResult0 = *result
 	}()
 
 	time.Sleep(time.Second * 3)
@@ -479,6 +484,10 @@ func TestClientRmSimple(t *testing.T) {
 
 	if strings.Contains(*lsResult1, testFile) {
 		t.Fatalf("Result %s should not contain %s ", *lsResult1, testFile)
+	}
+
+	if !strings.Contains(*rmResult0, fmt.Sprintf("Removed %s", remotePath)) {
+		t.Fatalf("Result %s should contain %s ", *lsResult1, testFile)
 	}
 
 	// TODO complete test to validate file is saved
@@ -1036,15 +1045,14 @@ func TestClientDownloadFailingNodes(t *testing.T) {
 
 	storageNode1 := storage.NewStorageNode(testStorageNode3, size, storageHost, storagePort3, testConfig, savePathStorageNode3)
 	go storageNode1.Start()
-	go func (storageNode *storage.StorageNode) {
+	go func(storageNode *storage.StorageNode) {
 		time.Sleep(time.Second * 20)
 		storageNode.Shutdown()
 	}(storageNode1)
 
-
 	storageNode2 := storage.NewStorageNode(testStorageNode4, size, storageHost, storagePort4, testConfig, savePathStorageNode4)
 	go storageNode2.Start()
-	go func (storageNode *storage.StorageNode) {
+	go func(storageNode *storage.StorageNode) {
 		time.Sleep(time.Second * 20)
 		storageNode.Shutdown()
 	}(storageNode2)

@@ -127,7 +127,7 @@ func (client *Client) sendToController(err error, message *connection.FileData, 
 	} else if result.MessageType == connection.MessageType_GET {
 		return nil, client.get(result, connectionHandler)
 	} else if result.MessageType == connection.MessageType_RM {
-		return nil, client.rm(result, connectionHandler)
+		return client.rm(result, connectionHandler)
 	} else if result.MessageType == connection.MessageType_ERROR {
 		log.Println("Error: ", result.Data)
 		return nil, errors.New(fmt.Sprintf("Error: %s", result.Data))
@@ -525,20 +525,15 @@ func (client *Client) saveData(numChunks int32, downloadChan chan []byte, saveLo
 	saveLock.Cond.Broadcast()
 }
 
-func (client *Client) rm(result *connection.FileData, handler *connection.ConnectionHandler) error {
+func (client *Client) rm(result *connection.FileData, handler *connection.ConnectionHandler) (*string, error) {
 	path := client.remotePath
-	chunkData, err := handler.Receive()
-	if err != nil {
-		log.Printf("Error getting data for delete %s\n", err)
-		return err
+	if result.MessageType != connection.MessageType_RM {
+		log.Printf("Unable to remove data from controller from client %s\n", path)
+		return nil, errors.New(result.Data)
 	}
-	if chunkData.MessageType != connection.MessageType_RM {
-		log.Printf("Unable to remove data from controller from client %s %s\n", path, err)
-		return errors.New(chunkData.Data)
-	}
-	log.Printf("Number of chunks to remvoe %d\n", len(chunkData.Chunk))
+	log.Printf("Number of chunks to remvoe %d\n", len(result.Chunk))
 	fmt.Printf("Removed %s\n", path)
-	return nil
+	return &result.Data, nil
 }
 
 func (client *Client) stats(result *connection.FileData, handler *connection.ConnectionHandler) (*string, error) {

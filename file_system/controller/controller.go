@@ -326,12 +326,15 @@ func (controller *Controller) rmHandler(handler *connection.ConnectionHandler, m
 		deleteMessage.Data = fmt.Sprintf("%s", err)
 		deleteMessage.MessageType = connection.MessageType_ERROR
 	} else {
+		deleteMessage.Data = fmt.Sprintf("Removed %s from file index ", message.Path)
 		deleteMessage.MessageType = connection.MessageType_RM
 	}
+	log.Println("Sending rm message with chunk data back to client")
 	err = handler.Send(deleteMessage)
 	if err != nil {
 		log.Println("Error sending delete chunks to client")
 	}
+	log.Println("Controller finished removing file ", message.Path)
 }
 
 func (controller *Controller) statsHandler(handler *connection.ConnectionHandler, message *connection.FileData) {
