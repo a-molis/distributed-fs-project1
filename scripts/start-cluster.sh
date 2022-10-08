@@ -29,7 +29,8 @@ ssh "${controller}" "cd ${file_system_dir} && pwd && ${file_system_dir}/dfs -typ
 echo "Starting Storage Nodes..."
 for node in ${nodes[@]}; do
     echo "${node}"
-    ssh "${node}" "cd ${file_system_dir} && "${file_system_dir}/dfs -type=storage -host=${HOSTNAME} -port=${storage_node_port} -id=${node} -storage_size=1000000 -local_path=${data_path}/sn" &> "${log_dir}/${node}.log" &"
+    host_name="${node}.cs.usfca.edu"
+    ssh "${node}" "cd ${file_system_dir} && "${file_system_dir}/dfs -type=storage -host=${host_name} -port=${storage_node_port} -id=${node} -storage_size=1000000 -local_path=${data_path}/sn" &> "${log_dir}/${node}.log" &"
     storage_node_port="$((storage_node_port + 1))"
 done
 
