@@ -112,7 +112,7 @@ func (memberTable *MemberTable) Shutdown() {
 }
 
 func (memberTable *MemberTable) Stats() (string, error) {
-	output := "StroageNode\t\t\t\t\t\tFreespace\t\t\tRequests"
+	output := "StroageNode\t\tFreespace\t\t\tRequests"
 	memberTable.lock.Lock()
 	defer memberTable.lock.Unlock()
 	for member := range memberTable.members {
