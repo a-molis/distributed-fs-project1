@@ -218,7 +218,8 @@ func (storageNode *StorageNode) chunkHeartbeat(message *connection.FileData) {
 	heartbeatMessage.Checksum = message.Checksum
 	heartbeatMessage.NumberOfRequests = storageNode.totalNumberOfRequests
 
-	heartbeatMessage.Size = storageNode.size.Sub(&storageNode.size, &storageNode.storedSize).Bytes()
+	var availableSize big.Int
+	heartbeatMessage.Size = availableSize.Sub(&storageNode.size, &storageNode.storedSize).Bytes()
 
 	storageNode.connectionHandler.Send(heartbeatMessage)
 }

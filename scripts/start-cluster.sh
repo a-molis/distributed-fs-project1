@@ -8,7 +8,7 @@ source "${script_dir}/nodes.sh"
 echo "script_dir :" ${script_dir}
 echo "log_dir :" ${log_dir}
 echo "file_system_dir :" ${file_system_dir}
-echo "controller_port :" ${storage_node_port}
+echo "controller_port :" ${controller_port}
 echo "storage_node_port :" ${storage_node_port}
 
 
