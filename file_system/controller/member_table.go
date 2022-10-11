@@ -117,7 +117,9 @@ func (memberTable *MemberTable) Stats() (string, error) {
 	defer memberTable.lock.Unlock()
 	for member := range memberTable.members {
 		m := memberTable.members[member]
-		output = output + "\n" + fmt.Sprintf("%s\t\t\t%s\t\t\t%d", member, m.availableSize, m.totalNumberOfRequests)
+		if m.status {
+			output = output + "\n" + fmt.Sprintf("%s\t\t\t%s\t\t\t%d", member, m.availableSize, m.totalNumberOfRequests)
+		}
 	}
 	return output, nil
 }

@@ -7,10 +7,12 @@ import (
 	"dfs/connection"
 	file_io "dfs/files_io"
 	"fmt"
+	"io"
 	"log"
 	"math/big"
 	"os"
 	"path/filepath"
+	"reflect"
 	"time"
 )
 
@@ -107,7 +109,8 @@ func (storageNode *StorageNode) heartbeat() {
 	message.MessageType = connection.MessageType_HEARTBEAT
 	message.SenderId = storageNode.id
 	for storageNode.running {
-		message.Size = storageNode.size.Sub(&storageNode.size, &storageNode.storedSize).Bytes()
+		var availableSize big.Int
+		message.Size = availableSize.Sub(&storageNode.size, &storageNode.storedSize).Bytes()
 		message.NumberOfRequests = storageNode.totalNumberOfRequests
 		err := storageNode.connectionHandler.Send(message)
 		if err != nil {
@@ -175,7 +178,7 @@ func (storageNode *StorageNode) uploadHandler(connectionHandler *connection.Conn
 		log.Println("Directory might alreay exist ", err)
 	}
 	file, err := os.Create(dirname + "/" + path)
-	defer file.Close()
+	//defer file.Close()
 	if err != nil {
 		log.Println("Error opening file ", path, err)
 		return
@@ -186,6 +189,26 @@ func (storageNode *StorageNode) uploadHandler(connectionHandler *connection.Conn
 	} else {
 		log.Printf("chunk %s saved \n", path)
 	}
+	file.Close()
+	fileCheck, err := os.Open(dirname + "/" + path)
+	if err != nil {
+		log.Println("Unable to open file to read ", err)
+	}
+	savedChecksum := md5.New()
+	_, err = io.Copy(savedChecksum, fileCheck)
+	if err != nil {
+		log.Println("Error reading saved checksum ", err)
+	}
+	if !reflect.DeepEqual(savedChecksum.Sum(nil), sum) {
+		log.Println("Saved checksum does not match for upload save on disk for storage node ", storageNode.id)
+	}
+	defer func(fileCheck *os.File) {
+		err := fileCheck.Close()
+		if err != nil {
+			log.Println("Failed to close file check ", err)
+		}
+	}(fileCheck)
+
 	//update the stored size in the node with the new chunk size
 	storageNode.addToStoredSize(size)
 	storageNode.totalNumberOfRequests++
