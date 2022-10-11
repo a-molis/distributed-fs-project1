@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-node1="orion05"
-node2="orion08"
+node1=$0
+node2=$1
 
 echo "Stopping Storage Nodes..."
 echo "${node1}"
