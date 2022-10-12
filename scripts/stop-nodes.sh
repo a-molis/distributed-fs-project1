@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-node1=$0
-node2=$1
+node1=$1
+node2=$2
 
 echo "Stopping Storage Nodes..."
 echo "${node1}"
