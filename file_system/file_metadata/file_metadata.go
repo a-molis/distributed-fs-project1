@@ -180,13 +180,14 @@ func (fileMetadata *FileMetadata) UpdateChecksum(path string, sum []byte) error 
 	return nil
 }
 
-func (fileMetadata *FileMetadata) HeartbeatHandler(path string, chunk string) bool {
+func (fileMetadata *FileMetadata) HeartbeatHandler(path string, chunk string, checkSum []byte) bool {
 	pathSplit := strings.Split(path, "/")
 	fileName := pathSplit[len(pathSplit)-1]
 	directoryPath := strings.Replace(path, fileName, "", -1)
 	directoryNode := getNode(fileMetadata.rootNode, directoryPath, false)
 	file := directoryNode.Files[fileName]
 	file.Chunks[chunk].Status = Complete
+	file.Chunks[chunk].Checksum = checkSum
 	file.PendingChunks = file.PendingChunks - 1 //TODO This should really be threadsafe
 	if file.PendingChunks <= 0 {
 		file.Status = Complete
@@ -237,7 +238,7 @@ type File struct {
 type Chunk struct {
 	Name         string
 	Size         int64
-	Checksum     int32
+	Checksum     []byte
 	Status       Status
 	StorageNodes []string //TODO this needs to be map for better pending state
 	Num          int32

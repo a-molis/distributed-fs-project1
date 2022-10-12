@@ -5,14 +5,12 @@ import (
 	"crypto/md5"
 	"dfs/config"
 	"dfs/connection"
-	file_io "dfs/files_io"
+	"encoding/binary"
 	"fmt"
-	"io"
 	"log"
 	"math/big"
 	"os"
 	"path/filepath"
-	"reflect"
 	"time"
 )
 
@@ -28,6 +26,10 @@ type StorageNode struct {
 	savePath              string
 	storedSize            big.Int
 	totalNumberOfRequests int32
+}
+
+type Data struct {
+	data []byte
 }
 
 func NewStorageNode(id string, size int64, host string, port int32, config *config.Config, savePath string) *StorageNode {
@@ -66,10 +68,11 @@ func (storageNode *StorageNode) Start() {
 }
 
 func (storageNode *StorageNode) createControllerConn() error {
+	log.Println("Creating controller conn from storage node ", storageNode.id)
 	connectionHandler, err := connection.NewClient(storageNode.config.ControllerHost, storageNode.config.ControllerPort)
 	if err != nil {
 		log.Printf("Error while startig the storageNode %s", err)
-		return nil
+		return err
 	}
 	storageNode.connectionHandler = connectionHandler
 
@@ -161,7 +164,10 @@ func (storageNode *StorageNode) uploadHandler(connectionHandler *connection.Conn
 
 	//read from stream
 	data := make([]byte, size)
-	connectionHandler.ReadN(data)
+	err := connectionHandler.ReadN(data)
+	if err != nil {
+		log.Printf("Did not read enough bytes off the stream for storage node uplaod %s\n", storageNode.id)
+	}
 
 	//compare checksums
 	sum := md5.Sum(data)
@@ -173,35 +179,44 @@ func (storageNode *StorageNode) uploadHandler(connectionHandler *connection.Conn
 
 	//save file
 	dirname := storageNode.savePath
-	err := os.Mkdir(dirname, 0700)
+	err = os.Mkdir(dirname, 0700)
 	if err != nil {
 		log.Println("Directory might alreay exist ", err)
 	}
-	file, err := os.Create(dirname + "/" + path)
-	//defer file.Close()
+
+	fileName := dirname + "/" + path
+	file, err := os.Create(fileName)
 	if err != nil {
 		log.Println("Error opening file ", path, err)
 		return
 	}
-	write, err := file.Write(data)
-	if err != nil || write < 1 {
+
+	err = binary.Write(file, binary.LittleEndian, data)
+	err = file.Close()
+	if err != nil {
+		log.Println("Error closing file for initial save of data on storage node")
+	}
+
+	if err != nil {
 		log.Println("Error saving data ", err)
 	} else {
 		log.Printf("chunk %s saved \n", path)
 	}
-	file.Close()
-	fileCheck, err := os.Open(dirname + "/" + path)
+
+	fileCheck, err := os.Open(fileName)
 	if err != nil {
 		log.Println("Unable to open file to read ", err)
 	}
-	savedChecksum := md5.New()
-	_, err = io.Copy(savedChecksum, fileCheck)
+	checkData := make([]byte, size)
+	err = binary.Read(fileCheck, binary.LittleEndian, checkData)
 	if err != nil {
-		log.Println("Error reading saved checksum ", err)
+		log.Println("error reading bytes")
 	}
-	if !reflect.DeepEqual(savedChecksum.Sum(nil), sum) {
+	checkDataChecksum := md5.Sum(checkData)
+	if bytes.Compare(checkDataChecksum[:], sum[:]) != 0 {
 		log.Println("Saved checksum does not match for upload save on disk for storage node ", storageNode.id)
 	}
+
 	defer func(fileCheck *os.File) {
 		err := fileCheck.Close()
 		if err != nil {
@@ -309,8 +324,10 @@ func (storageNode *StorageNode) downloadHandler(handler *connection.ConnectionHa
 	message *connection.FileData, getChan <-chan *connection.FileData) {
 	sendMessage := &connection.FileData{}
 	log.Printf("Storage node %s received request to download %s", storageNode.id, message.Path)
-	data, err := file_io.ReadFile(filepath.Join(storageNode.savePath, message.Path))
-	if err != nil {
+	data := make([]byte, message.DataSize)
+	file, err := os.Open(filepath.Join(storageNode.savePath, message.Path))
+	binaryReadErr := binary.Read(file, binary.LittleEndian, data)
+	if err != nil || binaryReadErr != nil {
 		sendMessage.MessageType = connection.MessageType_ERROR
 		err := handler.Send(sendMessage)
 		if err != nil {

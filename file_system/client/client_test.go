@@ -924,7 +924,7 @@ func TestClientStats(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 10)
 
 	if clientGetError != nil || clientPutError != nil || clientStatsError != nil {
 		t.Fatalf("client test failed %s, %s, %s\n", clientGetError, clientPutError, clientStatsError)
@@ -948,7 +948,7 @@ func TestClientDownloadFailingNodes(t *testing.T) {
 		name := "this_test_path_footxt_"
 		for i := 0; i < 10; i++ {
 			newName := fmt.Sprintf("%s%d", name, i)
-			for j := 0; j < 5; j++ {
+			for j := 0; j <= 12; j++ {
 				fullPath := fmt.Sprintf("./sn%d/%s", j, newName)
 				os.Remove(fullPath)
 				log.Println(fullPath)
@@ -975,7 +975,15 @@ func TestClientDownloadFailingNodes(t *testing.T) {
 	var storagePort1 int32 = 12092
 	var storagePort2 int32 = 12093
 	var storagePort3 int32 = 12094
-	var storagePort4 int32 = 12095
+	var storagePort4 int32 = 12096
+	var storagePort5 int32 = 12097
+	var storagePort6 int32 = 12098
+	var storagePort7 int32 = 12099
+	var storagePort8 int32 = 12100
+	var storagePort9 int32 = 12101
+	var storagePort10 int32 = 12102
+	var storagePort11 int32 = 12103
+	var storagePort12 int32 = 12104
 	var size int64 = 1000000
 	var chunkSize int64 = 5000000
 
@@ -1009,12 +1017,28 @@ func TestClientDownloadFailingNodes(t *testing.T) {
 	testStorageNode2 := "testStorageNode2"
 	testStorageNode3 := "testStorageNode3"
 	testStorageNode4 := "testStorageNode4"
+	testStorageNode5 := "testStorageNode5"
+	testStorageNode6 := "testStorageNode6"
+	testStorageNode7 := "testStorageNode7"
+	testStorageNode8 := "testStorageNode8"
+	testStorageNode9 := "testStorageNode9"
+	testStorageNode10 := "testStorageNode10"
+	testStorageNode11 := "testStorageNode11"
+	testStorageNode12 := "testStorageNode12"
 
 	savePathStorageNode0 := "sn0"
 	savePathStorageNode1 := "sn1"
 	savePathStorageNode2 := "sn2"
 	savePathStorageNode3 := "sn3"
 	savePathStorageNode4 := "sn4"
+	savePathStorageNode5 := "sn5"
+	savePathStorageNode6 := "sn6"
+	savePathStorageNode7 := "sn7"
+	savePathStorageNode8 := "sn8"
+	savePathStorageNode9 := "sn9"
+	savePathStorageNode10 := "sn10"
+	savePathStorageNode11 := "sn11"
+	savePathStorageNode12 := "sn12"
 
 	var members []string
 
@@ -1040,6 +1064,46 @@ func TestClientDownloadFailingNodes(t *testing.T) {
 
 	go func() {
 		storageNode := storage.NewStorageNode(testStorageNode2, size, storageHost, storagePort2, testConfig, savePathStorageNode2)
+		storageNode.Start()
+	}()
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode5, size, storageHost, storagePort5, testConfig, savePathStorageNode5)
+		storageNode.Start()
+	}()
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode6, size, storageHost, storagePort6, testConfig, savePathStorageNode6)
+		storageNode.Start()
+	}()
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode7, size, storageHost, storagePort7, testConfig, savePathStorageNode7)
+		storageNode.Start()
+	}()
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode8, size, storageHost, storagePort8, testConfig, savePathStorageNode8)
+		storageNode.Start()
+	}()
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode9, size, storageHost, storagePort9, testConfig, savePathStorageNode9)
+		storageNode.Start()
+	}()
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode10, size, storageHost, storagePort10, testConfig, savePathStorageNode10)
+		storageNode.Start()
+	}()
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode11, size, storageHost, storagePort11, testConfig, savePathStorageNode11)
+		storageNode.Start()
+	}()
+
+	go func() {
+		storageNode := storage.NewStorageNode(testStorageNode12, size, storageHost, storagePort12, testConfig, savePathStorageNode12)
 		storageNode.Start()
 	}()
 

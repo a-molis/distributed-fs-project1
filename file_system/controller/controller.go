@@ -151,7 +151,7 @@ func (controller *Controller) heartbeatHandler(connectionHandler *connection.Con
 	// we still update the chunk info so it might be best to save it regardless
 	if message.MessageType == connection.MessageType_HEARTBEAT_CHUNK {
 		// call some function here
-		controller.fileMetadata.HeartbeatHandler(message.Path, message.Data)
+		controller.fileMetadata.HeartbeatHandler(message.Path, message.Data, message.Checksum)
 		controller.SaveFileMetadata()
 	}
 }
@@ -277,7 +277,7 @@ func (controller *Controller) getHandler(handler *connection.ConnectionHandler, 
 
 	// TODO add check if in pending state //done
 	chunks, checksum, err := controller.fileMetadata.Download(message.Path)
-	controller.removeDeadNodes(chunks)
+	controller.RemoveDeadNodes(chunks)
 	if err != nil {
 		sendMessage.Data = fmt.Sprintf("%s", err)
 		sendMessage.MessageType = connection.MessageType_ERROR
@@ -293,7 +293,7 @@ func (controller *Controller) getHandler(handler *connection.ConnectionHandler, 
 	err = handler.Send(sendMessage)
 }
 
-func (controller *Controller) removeDeadNodes(chunks map[string]*file_metadata.Chunk) {
+func (controller *Controller) RemoveDeadNodes(chunks map[string]*file_metadata.Chunk) {
 	for _, v := range chunks {
 		for i, n := range v.StorageNodes {
 			if !controller.memberTable.members[n].status {

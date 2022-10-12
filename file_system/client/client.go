@@ -1,17 +1,18 @@
 package client
 
 import (
+	"bytes"
 	"crypto/md5"
 	"crypto/sha256"
 	. "dfs/atomic_data"
 	. "dfs/config"
 	"dfs/connection"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"hash"
 	"log"
 	"os"
-	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -269,15 +270,27 @@ func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) ([]b
 		return nil, err
 	}
 	checksum := sha256.New()
-	for chunkName := range chunkMetaMap {
-		chunkData, err := getChunkData(chunkMetaMap, chunkName, file)
+	chunkNames := make([]*chunkMeta, len(chunkMetaMap))
+	i := 0
+	for _, chunk := range chunkMetaMap {
+		chunkNames[i] = chunk
+		i++
+	}
+
+	sort.SliceStable(chunkNames, func(i, j int) bool {
+		return chunkNames[i].num < chunkNames[j].num
+	})
+
+	for _, chunk := range chunkNames {
+		name := chunk.name
+		chunkData, err := getChunkData(chunkMetaMap, name, file)
 		if err != nil {
-			log.Println("Error getting chunk data for chunk ", chunkName)
+			log.Println("Error getting chunk data for chunk ", name)
 			return nil, err
 		}
 		checksum.Write(chunkData)
 		wait.Add(1)
-		go client.sendChunk(chunkMetaMap, chunkName, blockingHandlerMap, chunkData, errorMap, errorLock, wait)
+		go client.sendChunk(chunkMetaMap, name, blockingHandlerMap, chunkData, errorMap, errorLock, wait)
 	}
 	for id, e := range errorMap {
 		if e != nil {
@@ -287,6 +300,8 @@ func (client *Client) sendChunksToNodes(chunkMetaMap map[string]*chunkMeta) ([]b
 	}
 	wait.Wait()
 	log.Println("Client finished sending data to storage nodes")
+	foo := checksum.Sum(nil)
+	log.Println("Put file checksum ", string(foo[:]))
 	return checksum.Sum(nil), nil
 }
 
@@ -357,13 +372,10 @@ func (client *Client) tryNode(conHandler *connection.ConnectionHandler, message 
 
 func getChunkData(chunkMetaMap map[string]*chunkMeta, chunkName string, file *os.File) ([]byte, error) {
 	chunkData := make([]byte, chunkMetaMap[chunkName].size)
-	numBytes, err := file.Read(chunkData)
+	err := binary.Read(file, binary.LittleEndian, chunkData)
 	if err != nil {
 		log.Println("Error reading bytes from target file", err)
 		return nil, err
-	}
-	if int64(numBytes) != chunkMetaMap[chunkName].size {
-		log.Println("Did not read same bytes as chunk size", chunkName)
 	}
 	return chunkData, err
 }
@@ -373,12 +385,12 @@ func getConnectionHandler(node *connection.Node, handlerMap map[string]*Blocking
 	if !ok {
 		blockingConnection = &BlockingConnection{}
 		conHandler, err := connection.NewClient(node.Hostname, int(node.Port))
-		blockingConnection.conHandler = conHandler
 		if err != nil {
 			log.Println("error connecting to node ", node.Hostname, " ", node.Port)
 			// TODO make this trigger switching to next node and repeat this iteration of the loop
 			return nil, errors.New("cannot connect to node")
 		}
+		blockingConnection.conHandler = conHandler
 		handlerMap[node.Id] = blockingConnection
 	}
 
@@ -396,7 +408,7 @@ func (client *Client) get(result *connection.FileData, handler *connection.Conne
 
 	// Using a channel as a blocking queue with size 10
 	// bytes only written into queue when in order
-	var downloadChan = make(chan []byte, 5)
+	var downloadChan = make(chan *ChunkNum, 10)
 	numChunks := int32(len(chunks))
 	nextChunkNum := NewAtomicInt(&chunks[0].Num)
 	saveLock := NewWaitNotify()
@@ -405,7 +417,8 @@ func (client *Client) get(result *connection.FileData, handler *connection.Conne
 	done = &f
 	checkSum := sha256.New()
 	var saveError error = nil
-	go client.saveData(numChunks, downloadChan, saveLock, checkSum, done, &saveError)
+
+	go client.saveData(numChunks, downloadChan, saveLock, &checkSum, done, &saveError)
 
 	for _, chunk := range chunks {
 		go getChunkFromStorage(chunk, blockingHandlerMap, nextChunkNum, saveLock, downloadChan)
@@ -416,7 +429,8 @@ func (client *Client) get(result *connection.FileData, handler *connection.Conne
 		if !*done {
 			saveLock.Cond.Wait()
 		} else {
-			if reflect.DeepEqual(savedChecksum, checkSum) {
+			downloadCheckSum := checkSum.Sum(nil)
+			if bytes.Compare(downloadCheckSum[:], savedChecksum[:]) != 0 {
 				log.Println("Error saving file, checksums do not match")
 				return errors.New("error saving file, checksums do not match")
 			} else {
@@ -428,8 +442,58 @@ func (client *Client) get(result *connection.FileData, handler *connection.Conne
 	return nil
 }
 
+func (client *Client) saveDataSynchronous(chunks []*connection.Chunk, handlerMap map[string]*BlockingConnection) ([]byte, error) {
+	checksum := sha256.New()
+
+	file, err := os.OpenFile(client.localPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("error saving data for file %s", client.localPath))
+	}
+	for _, chunk := range chunks {
+		var data []byte
+		var err error
+		for i, node := range chunk.Nodes {
+			if i > 0 {
+				log.Println("Error getting data from first node for download")
+			}
+			blockingHandler, err2 := getConnectionHandler(node, handlerMap)
+			if err2 != nil {
+				log.Println("Error dialing node")
+				continue
+			}
+			blockingHandler.mu.Lock()
+			conn := blockingHandler.conHandler
+
+			data, err = getBytesFromStorage(conn, chunk)
+			blockingHandler.mu.Unlock()
+			if err == nil {
+				break
+			}
+			log.Println("Error getting data from storage node")
+
+		}
+		if len(data) == 0 {
+			return nil, errors.New(fmt.Sprintf("error gettting data for chunk %d", chunk.Num))
+		}
+		checksum.Write(data)
+
+		err = binary.Write(file, binary.LittleEndian, data)
+		if err != nil {
+			return nil, errors.New(fmt.Sprintf("error writing data for chunk %d", chunk.Num))
+		}
+		log.Println("Wrote data for chunk ", chunk.Num)
+	}
+
+	return checksum.Sum(nil), nil
+}
+
+type ChunkNum struct {
+	data []byte
+	num  int32
+}
+
 func getChunkFromStorage(chunk *connection.Chunk, handlerMap map[string]*BlockingConnection,
-	nextChunkNum *AtomicInt, saveLock *WaitNotify, downloadChan chan []byte) {
+	nextChunkNum *AtomicInt, saveLock *WaitNotify, downloadChan chan *ChunkNum) {
 	// TODO should not just get the first node, should check other nodes if this fails
 
 	var data []byte
@@ -453,13 +517,16 @@ func getChunkFromStorage(chunk *connection.Chunk, handlerMap map[string]*Blockin
 		log.Println("Error getting data from storage node")
 
 	}
-
+	recievedCheckSum := md5.Sum(data)
+	if bytes.Compare(recievedCheckSum[:], chunk.Checksum[:]) != 0 {
+		log.Println("Saved checksum does not match for client download ")
+	}
 	saveLock.Cond.L.Lock()
 	sent := false
 	for !sent {
 		if nextChunkNum.Get() == chunk.Num {
-			log.Printf("Writing data for chunk num %d\n", chunk.Num)
-			downloadChan <- data
+			chunkNum := &ChunkNum{data: data, num: chunk.Num}
+			downloadChan <- chunkNum
 			nextChunkNum.Increment()
 			saveLock.Cond.L.Unlock()
 			break
@@ -473,6 +540,7 @@ func getBytesFromStorage(conn *connection.ConnectionHandler, chunk *connection.C
 	message := &connection.FileData{}
 	message.Path = chunk.Name
 	message.MessageType = connection.MessageType_GET
+	message.DataSize = chunk.Size
 	err := conn.Send(message)
 	if err != nil {
 		log.Printf("Error getting data from storage node for chunk %s\n", chunk.Name)
@@ -504,21 +572,21 @@ func getBytesFromStorage(conn *connection.ConnectionHandler, chunk *connection.C
 	return byteData, nil
 }
 
-func (client *Client) saveData(numChunks int32, downloadChan chan []byte, saveLock *WaitNotify, hash hash.Hash, done *bool, e *error) {
+func (client *Client) saveData(numChunks int32, downloadChan chan *ChunkNum, saveLock *WaitNotify, checkSum *hash.Hash, done *bool, e *error) {
 	file, err := os.OpenFile(client.localPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Println("Failed to open file on client for saving data ", err)
 		*e = err
 	}
 	for i := numChunks; i > 0; i-- {
-		data := <-downloadChan
-		write, err := file.Write(data)
-		hash.Write(data)
-		if err != nil || write != len(data) {
+		chunkNum := <-downloadChan
+		err = binary.Write(file, binary.LittleEndian, chunkNum.data)
+		(*checkSum).Write(chunkNum.data)
+		if err != nil {
 			log.Println("Error writing to save file ", err)
 			*e = err
 		}
-		log.Printf("recevied data of size %d\n", len(data))
+		log.Printf("Wrote data of size %d for chunkNum %d\n", len(chunkNum.data), chunkNum.num)
 		saveLock.Cond.Broadcast()
 	}
 	*done = true
