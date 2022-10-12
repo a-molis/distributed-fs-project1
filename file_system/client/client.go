@@ -377,8 +377,10 @@ func getChunkData(chunkMetaMap map[string]*chunkMeta, chunkName string, file *os
 }
 
 func getConnectionHandler(node *connection.Node, handlerMap *BlockingHandlerMap) (*BlockingConnection, error) {
+	handlerMap.Lock.Lock()
 	blockingConnection, ok := handlerMap.Get(node.Id)
 	if !ok {
+		log.Println("Adding new client connection to map for node id ", node.Id)
 		blockingConnection = &BlockingConnection{}
 		conHandler, err := connection.NewClient(node.Hostname, int(node.Port))
 		if err != nil {
@@ -389,7 +391,7 @@ func getConnectionHandler(node *connection.Node, handlerMap *BlockingHandlerMap)
 		blockingConnection.ConHandler = conHandler
 		handlerMap.Put(node.Id, blockingConnection)
 	}
-
+	handlerMap.Lock.Unlock()
 	return blockingConnection, nil
 }
 
@@ -404,7 +406,7 @@ func (client *Client) get(result *connection.FileData, handler *connection.Conne
 
 	// Using a channel as a blocking queue with size 10
 	// bytes only written into queue when in order
-	var downloadChan = make(chan *ChunkNum, 10)
+	var downloadChan = make(chan *ChunkNum, 30)
 	numChunks := int32(len(chunks))
 	nextChunkNum := NewAtomicInt(&chunks[0].Num)
 	saveLock := NewWaitNotify()

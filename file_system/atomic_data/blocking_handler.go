@@ -12,7 +12,7 @@ type BlockingConnection struct {
 
 type BlockingHandlerMap struct {
 	hashMap map[string]*BlockingConnection
-	mutex   sync.Mutex
+	Lock    sync.Mutex
 }
 
 func NewBlockingHandlerMap() *BlockingHandlerMap {
@@ -22,14 +22,10 @@ func NewBlockingHandlerMap() *BlockingHandlerMap {
 }
 
 func (bMap *BlockingHandlerMap) Put(host string, conn *BlockingConnection) {
-	bMap.mutex.Lock()
-	defer bMap.mutex.Unlock()
 	bMap.hashMap[host] = conn
 }
 
 func (bMap *BlockingHandlerMap) Get(host string) (*BlockingConnection, bool) {
-	bMap.mutex.Lock()
-	defer bMap.mutex.Unlock()
 	blockingConnection, ok := bMap.hashMap[host]
 	return blockingConnection, ok
 }
