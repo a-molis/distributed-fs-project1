@@ -62,7 +62,7 @@ Run a storage node with 1GB in size
 
 ## Design 
 
-Controller
+###Controller
  
  - Controller has two data structures. 
  - Member table to keep track of all storage nodes. 
@@ -70,7 +70,7 @@ Controller
  - Heartbeats are handled by the controller and recorded in the member table.
  - Heartbeats are sent every 5 seconds. The threshold for deactivating the storage node is 10 seconds. 
 
-Upload Process 
+###Upload Process 
 
  - Client splits the file into chunks and sends the chunk metadata to the controller. 
  - Controller responds with a list of 3 storage nodes for each chunk. It also reserves the filename in file metadata and sets the status of the file as pending
@@ -81,6 +81,19 @@ Upload Process
  - After saving the data storage node sends a heartbeat with the file info to the controller. 
  - Controller saves file metadata to disk after updating it with the heartbeat info
  - When the controller receives the heartbeats for every chunk it sets the file status as complete 
+
+
+###Download Process
+ 
+ - Client requests a file on the system
+ - If the file does not exist the operation is terminated
+ - If the file exists it starts the download process
+ - The client gets the chunk info from the controller
+ - The client then tries to make a connection to each storage node in parallel
+ - Then the data is retrieved in parallel 
+ - The data are sent to a channel in order to the channel
+ - Then the data are written off from the channel per chunk to disk
+ - The checksum is validated at the end of the save
 
 ## Testing
 
