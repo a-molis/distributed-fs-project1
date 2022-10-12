@@ -22,8 +22,9 @@ echo "Done!"
 echo "Creating log directory: ${log_dir}"
 mkdir -pv "${log_dir}"
 
-echo "Starting Controller..."
-ssh "${controller}" "cd ${file_system_dir} && pwd && ${file_system_dir}/dfs -type=controller -host=${HOSTNAME} -port=${controller_port} -id=${controller} &> "${log_dir}/controller.log" &"
+
+echo "Starting Controller on ${controller}..."
+ssh "${controller}" "cd ${file_system_dir} && pwd && ${file_system_dir}/dfs -type=controller -host=${controller}.cs.usfca.edu -port=${controller_port} -id=${controller} &> "${log_dir}/controller.log" &"
 
 
 echo "Starting Storage Nodes..."
