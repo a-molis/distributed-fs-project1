@@ -1,0 +1,13 @@
+We used every day given to us until the deadline. About one extra week.
+  
+We didn't face too restricted when working on our project. We could have benefited from a load balancer library which would help us manage the connections between controller the nodes and the client. 
+
+We would like to extend our fault tolerance for the storage nodes. Currently we are able to detect failures and redirect client accordingly, but we do not create new replicas. That would be a cool thing to add. 
+We can extend fault tolerance for the controller by either adding multiple controllers or have some other system for mitigating it. 
+We can add a loadbalancer to manage the connections between the client controller and storage nodes. 
+
+We worked about 4-5 each every weekday from the assignment date till the final dayline. We also had a presentation during this time so we missed a couple of days worth of work during that. The most difficult part was probably maintaining file integrity during chunking and reassembling, as well as the parallel uploads and retrievals. 
+
+We learned a lot from this project as well as sharpen our skills. Yamac did not take dsd so all of this material was new and interesting. I learned a lot about the fundamental concepts of distributed systems and networks.  
+
+We worked as a group. We came up with the design together during meetings. At first we started the project off by pair programming at the library. Afterwards we were able to work on our own feature branches in parallel based on what part of the project either of us found interesting. We did code reviews of each other's code throughout the project. Everything went well. 
